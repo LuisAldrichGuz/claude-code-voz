@@ -2,8 +2,10 @@
 
 Todo corre en esta maquina: nada de audio sale a internet.
 
-Es **aprieta para hablar**: mantienes la tecla **M5**, hablas, la sueltas y se manda.
-Nada se graba ni se transcribe sin la tecla.
+Dos formas de hablarle, la que te acomode:
+
+- **Manos libres**: empiezas la frase con **"Claudio"** y sigues hablando.
+- **Con la tecla**: mantienes la **M5** apretada y dictas lo que quieras sin nombrarlo.
 
 - **Oir**: whisper.cpp con CUDA (modelo `large-v3-turbo` en la RTX 5070). Sin usarse un
   rato suelta sus ~2 GB de VRAM y vuelve al apretar.
@@ -11,20 +13,23 @@ Nada se graba ni se transcribe sin la tecla.
   el navegador o donde sea.
 - **Hablar**: piper con la voz `es_MX-claude-high`.
 
-### Por que no hay palabra de activacion
+### La regla de manos libres es una sola
 
-La hubo, y no funcionaba. Con el microfono siempre abierto habia que adivinar si te
-hablaba a ti o a la tele, y eso se defendia con palabra clave comparada por parecido,
-ventanas de sesion, respiros, rescates y topes: ocho tiempos distintos peleandose entre
-si. Con un juego puesto se seguian colando sus dialogos como ordenes, y el nombre
--"Claude"- salia transcrito como "Claro". **Apretar una tecla no se adivina.**
+**Cada frase tiene que empezar con el nombre.** No hay ventanas, ni sesiones que se
+queden abiertas, ni respiros: eso fue lo que dejaba entrar los dialogos de un juego
+durante horas, porque bastaba con que algo abriera la sesion una vez para que todo lo
+que sonara despues entrara solo.
+
+Y el nombre es "Claudio" y no "Claude" porque whisper transcribe en espanol: "Claude" le
+salia "Claro" o "Cloud", y "Claro" es palabra comun. Para dictar largo sin repetirlo en
+cada frase esta la tecla.
 
 ## Como se usa
 
 | Accion | Como |
 |---|---|
-| Hablarle sin soltar la tecla | **toca** la M5, habla, **tocala otra vez** para mandar |
-| Algo corto | **manten** la M5 apretada, habla, sueltala |
+| Hablarle sin tocar nada | empieza la frase con **"Claudio"** |
+| Dictar largo | **manten** la M5 apretada, habla, sueltala |
 | A donde va | a tu Claude maestro en tmux, estes en la ventana que estes |
 | Dictar en otro lado | empieza con "escribe": va a la ventana que tengas enfrente |
 | Interrumpir la lectura | pica la pastilla |
@@ -40,7 +45,8 @@ Es lo unico que se ve en pantalla, arriba a la derecha:
 
 | Color | Que pasa |
 |---|---|
-| gris claro | listo; aprieta y habla |
+| gris claro | listo; di "Claudio" o aprieta la tecla |
+| cian | oyendo una frase; vale solo si trae el nombre |
 | verde | tienes la tecla apretada, te esta grabando |
 | ambar | transcribiendo, o el agente trabajando |
 | morado | leyendo en voz alta |

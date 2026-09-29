@@ -21,13 +21,16 @@ from collections import deque
 from voz.agentes import envio, sesion
 from voz.control import config, estado
 from voz.dictado import teclado
+from voz.escucha.deteccion_voz import CortadorDeVoz
 from voz.escucha.microfono import Microfono, destapa
+from voz.escucha import palabra_clave
 from voz.transcripcion.whisper_local import Transcriptor
 
 
 class Asistente:
     def __init__(self):
         self.transcriptor = Transcriptor()
+        self.cortador = CortadorDeVoz()
         self.pendientes = queue.Queue()
         self.grabando = threading.Event()
         self.audio = bytearray()
@@ -46,6 +49,7 @@ class Asistente:
         if not estado.escuchando() or self.grabando.is_set():
             return
         self.apretada_desde = time.time()
+        self.cortador.reinicia()
         if not self.transcriptor.arranca():
             estado.avisa("Voz: no arrancó whisper", "Revisa voz-whisper/build", "critical")
             return
@@ -84,7 +88,7 @@ class Asistente:
                           "no se oyo nada, no se mando")
             return
         self.trabajando = True
-        self.pendientes.put(audio)
+        self.pendientes.put((audio, False))
 
     def alterna(self):
         """Enciende o apaga el asistente entero (para juntas, o para soltar la VRAM)."""
@@ -147,8 +151,17 @@ class Asistente:
                 for frame in micro.frames():
                     if not self.vivo or not estado.escuchando():
                         break
+                    if config.HABLANDO.exists():
+                        # Hablar y escuchar no conviven: con el microfono abierto
+                        # mientras piper lee, basta con que el nombre salga en la
+                        # respuesta para que se mande un mensaje a si mismo.
+                        self.cortador.reinicia()
+                        colchon.clear()
+                        self.late(fase="hablando")
+                        continue
                     if not self.grabando.is_set():
                         colchon.append(frame)
+                        self.manos_libres(frame)
                         continue
                     with self.candado:
                         if colchon:
@@ -157,24 +170,46 @@ class Asistente:
                         self.audio += frame
                     self.late(fase="grabando", nivel=_fuerza(frame))
 
+    def manos_libres(self, frame):
+        """Sin tecla: se oye siempre, pero CADA frase tiene que empezar con el nombre.
+
+        Una sola regla, sin ventanas ni sesiones abiertas. La version que las tenia
+        dejaba entrar los dialogos de un juego durante horas: bastaba con que algo
+        abriera la sesion una vez para que todo lo que sonara despues entrara solo.
+        """
+        frase = self.cortador.empuja(frame)
+        if frase is not None:
+            self.trabajando = True
+            self.pendientes.put((frase, True))
+        elif self.cortador.grabando:
+            self.late(fase="oyendo", nivel=self.cortador.probabilidad)
+
     # --- hilo TRABAJAR: aqui si se puede tardar ---------------------------
     def trabaja(self):
         while self.vivo:
             try:
-                audio = self.pendientes.get(timeout=0.5)
+                audio, sin_tecla = self.pendientes.get(timeout=0.5)
             except queue.Empty:
                 continue
             try:
-                self.atiende(audio)
+                self.atiende(audio, sin_tecla)
             finally:
                 self.trabajando = not self.pendientes.empty()
 
-    def atiende(self, audio):
+    def atiende(self, audio, sin_tecla=False):
         texto = self.transcriptor.texto_de(audio).strip()
         segundos = len(audio) / (config.TASA * 2)
         estado.apunta(f"{time.strftime('%H:%M:%S')}  [{segundos:4.1f}s] oido: {texto!r}")
         if not texto:
             return
+        if sin_tecla:
+            llamado, resto = palabra_clave.separa_nombre(texto)
+            if not llamado:
+                estado.apunta(f"{time.strftime('%H:%M:%S')}  sin el nombre, no se entrego")
+                return
+            texto = resto.strip()
+            if not texto:
+                return
         self.ultimo_texto = texto
         primera = texto.lower().split()[:1]
         if primera and primera[0].strip(",.") in ("escribe", "dicta", "teclea"):

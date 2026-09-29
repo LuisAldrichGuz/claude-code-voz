@@ -26,7 +26,7 @@ LINEAS_MAX = 3     # mas que esto ya es un panel, no un aviso
 MARGEN = 12        # separacion de la esquina
 
 # Solo estas fases justifican tapar pantalla: cuando de verdad te esta atendiendo.
-ACTIVAS = ("grabando", "pensando", "hablando")
+ACTIVAS = ("oyendo", "grabando", "pensando", "hablando")
 
 
 class Punto(Gtk.DrawingArea):

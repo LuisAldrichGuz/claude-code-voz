@@ -5,6 +5,7 @@
 FASES = {
     "apagado":    ("#6b7280", False),   # asistente apagado; la tecla no hace nada
     "esperando":  ("#7c8797", False),   # listo: aprieta la tecla y habla
+    "oyendo":     ("#22d3ee", True),    # sin tecla: oye una frase, vale si trae el nombre
     "grabando":   ("#34d399", True),    # tienes la tecla apretada, te esta grabando
     "pensando":   ("#fbbf24", True),    # transcribiendo lo que dijiste
     "hablando":   ("#a78bfa", True),    # leyendo en voz alta

@@ -20,8 +20,29 @@ VOZ_MODELO = RAIZ / "voces" / "es_MX-claude-high.onnx"
 TASA = 16000          # whisper solo come 16 kHz mono
 MUESTRAS_FRAME = 512  # 32 ms por frame
 MINIMO = 0.35         # segundos; por debajo de esto fue un roce de tecla, no una frase
-COLCHON = 0.5         # segundos previos que se guardan, por si aprietas tarde
+COLCHON = 0.8         # segundos previos que se guardan, por si aprietas tarde
 MUDO = 0.04           # por debajo de esto no hubo voz: whisper alucinaria una frase
+
+# --- manos libres: deteccion de voz (Silero: reconoce voz humana, no volumen) ---
+MODELO_VAD = RAIZ / "modelos" / "silero_vad.onnx"
+VOZ_SEGURA = 0.55      # de aqui para arriba, Silero dice "esto es una persona"
+VOZ_DUDOSA = 0.35      # mientras hablas, con esto basta para no cortarte
+FRAMES_ARRANQUE = 2    # ~60 ms de voz seguida para abrir una frase
+SILENCIO_CIERRE = 1.4  # silencio que cierra una frase corta
+SILENCIO_LARGO = 2.4   # el que se exige cuando ya llevas rato hablando
+FRASE_LARGA = 3.5      # a partir de aqui la frase cuenta como larga
+ENUNCIADO_MAX = 45.0   # corte duro por si el microfono se queda abierto
+
+# --- manos libres: la palabra de activacion ---
+# CADA frase tiene que empezar con el nombre. Sin ventanas ni sesiones abiertas: eso fue
+# lo que dejaba entrar los dialogos de un juego durante horas.
+DESPIERTO = "claudio"
+VARIANTES = ("claudio", "claudia", "clodio", "claudios", "cloudio", "glaudio",
+             "claude", "clod", "cloud", "clau", "clode", "clot", "claud", "cloude",
+             "clow", "gloud", "glod", "glaude", "glau")
+# Palabras que se parecen al nombre pero NUNCA lo son: "audio" va dentro de "claudio" y
+# Luis habla de audio a cada rato; "claro" era la otra que despertaba a media charla.
+NO_ES_NOMBRE = ("audio", "claro", "clase", "clave", "cuadro", "aludio")
 
 # --- tiempos ---
 VRAM_LIBRE_TRAS = 300.0   # sin usarse, whisper suelta sus ~2 GB de VRAM
