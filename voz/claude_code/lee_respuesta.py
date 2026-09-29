@@ -153,6 +153,8 @@ def _traza(motivo):
 
 
 def main():
+    # El turno acabo: se apaga aqui pase lo que pase, incluso si no toca hablar.
+    config.TRABAJANDO.unlink(missing_ok=True)
     if not estado.escuchando():
         _traza("callado, el micro esta apagado")
         return 0

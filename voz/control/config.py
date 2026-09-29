@@ -60,4 +60,5 @@ ESCUCHANDO = RUN / "escuchando"   # existe = asistente encendido
 PULSO = RUN / "pulso.json"        # lo que el indicador pinta
 DIALOGO = RUN / "dialogo.json"    # lo que el agente esta haciendo o contestando
 HABLANDO = RUN / "hablando"       # existe = el TTS esta sonando
+TRABAJANDO = RUN / "trabajando"   # existe = el agente esta a media respuesta
 REGISTRO = CASA / ".local" / "state" / "voz.log"
