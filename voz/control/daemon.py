@@ -59,6 +59,8 @@ class Asistente:
         self.ultimo_texto = ""
         self.ultimo_uso = time.time()
         self.ultima_voz = 0.0    # ultima vez que se te oyo algo, para no cerrarte el turno
+        self.veces_listo = 0     # lecturas seguidas viendo al agente en su prompt
+        self.ultimo_vistazo = 0.0
         self.turno_whisper = threading.Lock()
         self.vivo = True
 
@@ -299,6 +301,24 @@ class Asistente:
                                  if sesion.pide_confianza() else "el agente no está listo")
             self.pasa_a(DORMIDO)
 
+    def acabo_de_verdad(self):
+        """True solo si el agente lleva VARIAS lecturas seguidas en su prompt.
+
+        Una sola no basta: entre una herramienta y la siguiente el prompt reaparece un
+        instante, y el punto se ponia gris mientras el agente seguia trabajando. Viendolo
+        apagado, parece que no te hizo caso y que se perdio lo que pediste.
+        """
+        # Espaciadas: mirar la pantalla del agente cuesta un proceso, y tres lecturas
+        # pegadas no prueban nada -el prompt reaparece un instante entre herramientas-.
+        if time.time() - self.ultimo_vistazo < 1.5:
+            return False
+        self.ultimo_vistazo = time.time()
+        if sesion.listo() and not config.HABLANDO.exists():
+            self.veces_listo += 1
+        else:
+            self.veces_listo = 0
+        return self.veces_listo >= 3
+
     # --- hilo MIRILLA: reconocerte el nombre EN VIVO -------------------------
     def mira(self):
         """Relee a media frase para contestar el nombre en el momento.
@@ -361,9 +381,10 @@ class Asistente:
                 if config.HABLANDO.exists():
                     self.pasa_a(HABLANDO)
                 elif self.lleva > config.TURNO_MAX:
+                    self.veces_listo = 0
                     # Algo se atoro; no dejarte sordo para siempre.
                     self.pasa_a(DORMIDO)
-                elif self.lleva > 6.0 and sesion.listo():
+                elif self.lleva > 8.0 and self.acabo_de_verdad():
                     # Los primeros segundos el agente todavia se ve en su prompt aunque
                     # ya le llego el mensaje. Y el aviso se apaga AQUI: esperar a estar
                     # dormido para apagarlo era un nudo -no salia de pensando porque el
