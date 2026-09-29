@@ -26,12 +26,12 @@ MUDO = 0.04           # por debajo de esto no hubo voz: whisper alucinaria una f
 # --- manos libres: deteccion de voz (Silero: reconoce voz humana, no volumen) ---
 MODELO_VAD = RAIZ / "modelos" / "silero_vad.onnx"
 VOZ_SEGURA = 0.55      # de aqui para arriba, Silero dice "esto es una persona"
-VOZ_DUDOSA = 0.35      # mientras hablas, con esto basta para no cortarte
+VOZ_DUDOSA = 0.50      # mientras hablas, con esto basta para no cortarte
 FRAMES_ARRANQUE = 2    # ~60 ms de voz seguida para abrir una frase
 SILENCIO_CIERRE = 1.4  # silencio que cierra una frase corta
 SILENCIO_LARGO = 2.4   # el que se exige cuando ya llevas rato hablando
 FRASE_LARGA = 3.5      # a partir de aqui la frase cuenta como larga
-ENUNCIADO_MAX = 45.0   # corte duro por si el microfono se queda abierto
+ENUNCIADO_MAX = 20.0   # corte duro por si el microfono se queda abierto
 
 # --- manos libres: la palabra de activacion ---
 # CADA frase tiene que empezar con el nombre. Sin ventanas ni sesiones abiertas: eso fue
