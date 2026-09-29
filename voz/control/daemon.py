@@ -40,6 +40,7 @@ class Asistente:
         self.apretada_desde = 0.0
         self.invocado_hasta = 0.0
         self.mi_turno_desde = 0.0   # mientras el agente contesta, el micro no oye
+        self.sordo_hasta = 0.0      # enfriamiento al acabar de hablar
         self.borrador = []
         self.borrador_hasta = 0.0
         self.trabajando = False
@@ -206,12 +207,20 @@ class Asistente:
             self.mi_turno_desde = 0.0     # algo se atoro; no dejarlo sordo para siempre
             return False
         if config.HABLANDO.exists():
+            # Al soltar la marca, la cola de audio todavia suena un instante y entraba
+            # entera por el microfono. Se deja un enfriamiento.
+            self.sordo_hasta = time.time() + config.ENFRIA
             return True
         # Los primeros segundos el agente todavia se ve en su prompt aunque ya le llego.
         if ahora - self.mi_turno_desde < 6.0:
             return True
         if sesion.listo() and not estado.dialogo():
             self.mi_turno_desde = 0.0
+            # Turno cerrado: para volver a hablarle hay que invocarlo otra vez, y lo que
+            # quedara a medias no se arrastra a la conversacion siguiente.
+            self.invocado_hasta = 0.0
+            with self.candado:
+                self.borrador = []
             return False
         return True
 
@@ -222,7 +231,7 @@ class Asistente:
         dejaba entrar los dialogos de un juego durante horas: bastaba con que algo
         abriera la sesion una vez para que todo lo que sonara despues entrara solo.
         """
-        if self.mi_turno():
+        if self.mi_turno() or time.time() < self.sordo_hasta:
             # Ni se graba: es la unica forma de que no se le cuele el cuarto entero
             # mientras contesta.
             self.cortador.reinicia()
