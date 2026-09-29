@@ -218,7 +218,7 @@ class Asistente:
         if not texto:
             return
         if sin_tecla:
-            llamado, resto = palabra_clave.separa_nombre(texto)
+            llamado, resto = palabra_clave.separa_nombre(texto, donde_sea=True)
             if not llamado:
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  sin el nombre, no se entrego")
                 return

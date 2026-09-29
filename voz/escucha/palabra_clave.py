@@ -35,15 +35,20 @@ def suena_al_nombre(palabra):
     return max(difflib.SequenceMatcher(None, palabra, f).ratio() for f in formas) >= 0.75
 
 
-def separa_nombre(texto):
+def separa_nombre(texto, donde_sea=False):
     """Devuelve (te_llamaron, resto).
 
-    El nombre solo cuenta en las primeras tres palabras: asi "Claudio, borra esto"
-    despierta y "el codigo de Claudio esta raro" no. El resto se devuelve TAL CUAL se
-    dijo; la normalizacion sirve solo para comparar.
+    Normalmente el nombre solo cuenta en las primeras tres palabras: asi "Claudio, borra
+    esto" despierta y "el codigo de Claudio esta raro" no.
+
+    Con `donde_sea` se busca en toda la frase, y eso es lo que hace falta sin la tecla:
+    con una tele o un juego sonando, el detector de voz abre la frase con el ruido y lo
+    que tu dices se pega DETRAS, asi que tu nombre nunca cae en las primeras palabras y
+    no pasaba nada por mas veces que lo dijeras. Se entrega lo que va despues del nombre.
     """
     palabras = texto.split()
-    for i, palabra in enumerate(palabras[:3]):
+    ventana = len(palabras) if donde_sea else 3
+    for i, palabra in enumerate(palabras[:ventana]):
         if suena_al_nombre(normaliza(palabra)):
             return True, " ".join(palabras[i + 1:]).lstrip(" ,.;:")
     return False, texto
