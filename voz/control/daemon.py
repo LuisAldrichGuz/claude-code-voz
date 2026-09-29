@@ -236,7 +236,11 @@ class Asistente:
             llamado, resto = palabra_clave.separa_nombre(texto, donde_sea=True)
             if llamado:
                 texto = resto.strip()
-            elif not self.borrador:
+                # Decir solo el nombre y arrancar a hablar despues tambien vale: sin
+                # esto, "Claudio." se quedaba en nada y la frase siguiente se tiraba
+                # por no llevarlo.
+                self.invocado_hasta = time.time() + config.RESPIRO + 2.0
+            elif not self.borrador and time.time() > self.invocado_hasta:
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  sin el nombre, no se entrego")
                 return
             # Todo lo que digas de corrido es UN mensaje: las frases se cortan a los
