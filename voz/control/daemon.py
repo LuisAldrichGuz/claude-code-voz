@@ -125,10 +125,25 @@ class Asistente:
         estado.marca_escuchando(True)
         destapa()
         for tarea in (self.graba, self.trabaja, self.vigila):
-            threading.Thread(target=tarea, daemon=True).start()
+            threading.Thread(target=self._sin_morirse, args=(tarea,), daemon=True).start()
         while self.vivo:
             time.sleep(0.2)
         config.PID.unlink(missing_ok=True)
+
+    def _sin_morirse(self, tarea):
+        """Vuelve a levantar el hilo si se cae, y lo deja escrito.
+
+        Un hilo de estos muriendo deja al asistente sordo o mudo sin ninguna senal:
+        el demonio sigue "vivo", el microfono sigue "encendido" y no pasa nada.
+        """
+        while self.vivo:
+            try:
+                tarea()
+                return
+            except Exception as falla:
+                estado.apunta(f"{time.strftime('%H:%M:%S')}  SE CAYO {tarea.__name__}: "
+                              f"{falla!r}; lo levanto otra vez")
+                time.sleep(1.0)
 
     # --- hilo GRABAR: rapido siempre --------------------------------------
     def graba(self):

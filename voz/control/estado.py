@@ -1,5 +1,7 @@
 """Lo que el sistema te muestra y te suena: marcas en disco, avisos y tonos."""
 import json
+import os
+import threading
 import math
 import time
 import struct
@@ -90,9 +92,15 @@ def publica(**datos):
     """
     config.RUN.mkdir(parents=True, exist_ok=True)
     datos["hora"] = time.time()
-    temporal = config.PULSO.with_suffix(".tmp")
-    temporal.write_text(json.dumps(datos))
-    temporal.replace(config.PULSO)
+    # Un temporal POR HILO. Con uno solo, dos hilos publicando a la vez se pisaban: el
+    # primero renombraba y al segundo le estallaba un FileNotFoundError que se llevaba
+    # el hilo del microfono entero, y el asistente se quedaba sordo sin decir nada.
+    temporal = config.PULSO.with_suffix(f".{os.getpid()}.{threading.get_ident()}.tmp")
+    try:
+        temporal.write_text(json.dumps(datos))
+        temporal.replace(config.PULSO)
+    except OSError:
+        temporal.unlink(missing_ok=True)
 
 
 DORMIDO = {"fase": "apagado", "nivel": 0.0, "umbral": 1.0, "texto": ""}
