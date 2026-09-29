@@ -302,6 +302,10 @@ class Asistente:
             if not estado.escuchando():
                 continue
             ahora = time.time()
+            # El pulso se publica SIEMPRE, no solo cuando algo cambia: la isla se
+            # esconde sola si deja de recibirlo, y con la publicacion cada dos segundos
+            # el punto se abria y se cerraba solo.
+            self.late()
 
             # Empiece donde empiece, si esta leyendo en voz alta el microfono se cierra.
             if config.HABLANDO.exists() and self.estado not in (HABLANDO, OYENDO):
@@ -352,7 +356,6 @@ class Asistente:
                     and ahora - self.ultimo_uso > config.VRAM_LIBRE_TRAS):
                 self.transcriptor.detiene()
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  whisper dormido, VRAM libre")
-            self.late()
 
     # --- lo que pinta la isla ----------------------------------------------
     def late(self, nivel=0.0):

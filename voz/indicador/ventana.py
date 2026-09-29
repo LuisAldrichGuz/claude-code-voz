@@ -160,7 +160,9 @@ class Isla(Gtk.ApplicationWindow):
             return True
         self.punto.actualiza(color, late)
         # Solo lo que dijiste tu: la respuesta se oye, no se lee.
-        dictando = fase in ("grabando", "pensando")
+        # Solo mientras hablas: cuando ya esta pensando, el texto dictado estorba - lo
+        # que importa ver entonces es que esta trabajando, no repetir lo que dijiste.
+        dictando = fase in ("grabando", "respiro")
         self._muestra_frase((p.get("texto") or "").strip() if dictando else "")
         return True
 
