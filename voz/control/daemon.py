@@ -38,6 +38,7 @@ class Asistente:
         self.ultimo_texto = ""
         self.ultimo_uso = time.time()
         self.apretada_desde = 0.0
+        self.invocado_hasta = 0.0
         self.trabajando = False
         self.vivo = True
 
@@ -124,6 +125,9 @@ class Asistente:
         config.PID.write_text(str(os.getpid()))
         estado.marca_escuchando(True)
         destapa()
+        # Se levanta ya: si espera al primer uso, esa primera frase se queda esperando
+        # a que el modelo suba a la GPU.
+        self.transcriptor.arranca()
         for tarea in (self.graba, self.trabaja, self.vigila):
             threading.Thread(target=self._sin_morirse, args=(tarea,), daemon=True).start()
         while self.vivo:
@@ -212,17 +216,33 @@ class Asistente:
                 self.trabajando = not self.pendientes.empty()
 
     def atiende(self, audio, sin_tecla=False):
+        # Aqui tambien, no solo al apretar la tecla: sin esto, lo que oye sin tecla
+        # llegaba a un whisper apagado -lo apaga el vigilante para soltar la VRAM- y
+        # volvia siempre vacio. Se oia perfecto, se cortaba la frase, y no pasaba nada.
+        if not self.transcriptor.arranca():
+            estado.apunta(f"{time.strftime('%H:%M:%S')}  whisper no arranco, frase perdida")
+            return
+        self.ultimo_uso = time.time()
         texto = self.transcriptor.texto_de(audio).strip()
         segundos = len(audio) / (config.TASA * 2)
-        estado.apunta(f"{time.strftime('%H:%M:%S')}  [{segundos:4.1f}s] oido: {texto!r}")
+        estado.apunta(f"{time.strftime('%H:%M:%S')}  [{segundos:4.1f}s fuerza {_fuerza(audio):.2f}"
+                      f"{' sin tecla' if sin_tecla else ''}] oido: {texto!r}")
         if not texto:
             return
         if sin_tecla:
             llamado, resto = palabra_clave.separa_nombre(texto, donde_sea=True)
-            if not llamado:
+            if llamado:
+                # Acabas de invocarlo: lo que sigas diciendo un rato es la misma orden.
+                # Las frases se cortan cortas a proposito -con ruido continuo, una de
+                # veinte segundos sale vacia de whisper-, asi que una orden larga llega
+                # partida y solo el primer pedazo lleva el nombre.
+                self.invocado_hasta = time.time() + config.SEGUIR
+                texto = resto.strip()
+            elif time.time() < self.invocado_hasta:
+                self.invocado_hasta = time.time() + config.SEGUIR
+            else:
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  sin el nombre, no se entrego")
                 return
-            texto = resto.strip()
             if not texto:
                 return
         self.ultimo_texto = texto

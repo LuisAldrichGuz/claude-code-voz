@@ -31,7 +31,8 @@ FRAMES_ARRANQUE = 2    # ~60 ms de voz seguida para abrir una frase
 SILENCIO_CIERRE = 1.4  # silencio que cierra una frase corta
 SILENCIO_LARGO = 2.4   # el que se exige cuando ya llevas rato hablando
 FRASE_LARGA = 3.5      # a partir de aqui la frase cuenta como larga
-ENUNCIADO_MAX = 20.0   # corte duro por si el microfono se queda abierto
+ENUNCIADO_MAX = 8.0    # corte duro: con ruido continuo las frases largas salen vacias
+SEGUIR = 12.0          # tras invocarlo, este rato admite frases sin repetir el nombre
 
 # --- manos libres: la palabra de activacion ---
 # CADA frase tiene que empezar con el nombre. Sin ventanas ni sesiones abiertas: eso fue
@@ -45,7 +46,7 @@ VARIANTES = ("claudio", "claudia", "clodio", "claudios", "cloudio", "glaudio",
 NO_ES_NOMBRE = ("audio", "claro", "clase", "clave", "cuadro", "aludio")
 
 # --- tiempos ---
-VRAM_LIBRE_TRAS = 300.0   # sin usarse, whisper suelta sus ~2 GB de VRAM
+VRAM_LIBRE_TRAS = 900.0   # sin usarse, whisper suelta sus ~2 GB de VRAM
 GRABACION_MAX = 180.0     # tope por si la tecla se queda trabada
 
 # --- estado en disco (se borra al reiniciar la maquina) ---
