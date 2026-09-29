@@ -58,6 +58,7 @@ class Asistente:
         self.audio = bytearray()      # lo grabado con la tecla
         self.ultimo_texto = ""
         self.ultimo_uso = time.time()
+        self.turno_whisper = threading.Lock()
         self.vivo = True
 
     # --- el estado ---------------------------------------------------------
@@ -149,7 +150,7 @@ class Asistente:
         # Se levanta ya: esperando al primer uso, la primera frase se queda esperando a
         # que el modelo suba a la GPU.
         self.transcriptor.arranca()
-        for tarea in (self.graba, self.trabaja, self.vigila):
+        for tarea in (self.graba, self.trabaja, self.vigila, self.mira):
             threading.Thread(target=self._sin_morirse, args=(tarea,), daemon=True).start()
         while self.vivo:
             time.sleep(0.2)
@@ -236,7 +237,8 @@ class Asistente:
             estado.apunta(f"{time.strftime('%H:%M:%S')}  whisper no arranco, frase perdida")
             return
         self.ultimo_uso = time.time()
-        texto = self.transcriptor.texto_de(audio).strip()
+        with self.turno_whisper:
+            texto = self.transcriptor.texto_de(audio).strip()
         segundos = len(audio) / (config.TASA * 2)
         estado.apunta(f"{time.strftime('%H:%M:%S')}  [{segundos:4.1f}s fuerza {_fuerza(audio):.2f}"
                       f"{' sin tecla' if sin_tecla else ''}] oido: {texto!r}")
@@ -293,6 +295,30 @@ class Asistente:
             self.ultimo_texto = ("aprueba la carpeta: voz ver"
                                  if sesion.pide_confianza() else "el agente no está listo")
             self.pasa_a(DORMIDO)
+
+    # --- hilo MIRILLA: reconocerte el nombre EN VIVO -------------------------
+    def mira(self):
+        """Relee a media frase para contestar el nombre en el momento.
+
+        Esperar a que la frase cierre son casi dos segundos hablandole sin ninguna
+        senal de que te oye. Aqui se transcribe lo que llevas dicho y, en cuanto
+        aparece el nombre, suena el tono y el punto se pone verde.
+        """
+        while self.vivo:
+            time.sleep(config.MIRILLA)
+            if self.estado != DORMIDO or self.tecla or not estado.escuchando():
+                continue
+            if not self.cortador.grabando or self.cortador.muestras < config.TASA * 0.7:
+                continue
+            if not self.turno_whisper.acquire(blocking=False):
+                continue   # la frase ya cerrada siempre importa mas que el avance
+            try:
+                texto = self.transcriptor.texto_de(self.cortador.copia_parcial())
+            finally:
+                self.turno_whisper.release()
+            if texto and palabra_clave.separa_nombre(texto, donde_sea=True)[0]:
+                estado.tono("despierto")
+                self.pasa_a(OYENDO)
 
     # --- hilo VIGILAR: los tiempos ------------------------------------------
     def vigila(self):
