@@ -58,6 +58,7 @@ class Asistente:
         self.audio = bytearray()      # lo grabado con la tecla
         self.ultimo_texto = ""
         self.ultimo_uso = time.time()
+        self.ultima_voz = 0.0    # ultima vez que se te oyo algo, para no cerrarte el turno
         self.turno_whisper = threading.Lock()
         self.vivo = True
 
@@ -212,7 +213,9 @@ class Asistente:
         if frase is not None:
             self.pendientes.put((frase, True))
             self.pasa_a(RESPIRO if self.borrador else DORMIDO)
-        elif self.cortador.grabando and self.estado in (RESPIRO, OYENDO):
+        if self.cortador.grabando:
+            self.ultima_voz = time.time()
+        if frase is None and self.cortador.grabando and self.estado in (RESPIRO, OYENDO):
             # El verde solo DESPUES de que se te reconocio el nombre. Encenderlo con
             # cualquier voz que el detector oyera era mentir: con alguien hablando de
             # fondo parecia que te estaba atendiendo, y no le estaba haciendo caso a
@@ -341,8 +344,13 @@ class Asistente:
                 # Si solo dijiste el nombre, el respiro es mas largo: dos segundos
                 # no alcanzan para invocarlo y ponerse a hablar, y se cerraba el turno
                 # antes de que empezaras.
+                # El respiro se cuenta desde la ultima vez que se te OYO, no desde
+                # que cambio el estado: diciendo el nombre y arrancando a hablar, el
+                # turno se cerraba a media frase y lo que seguia se tiraba por no
+                # llevar el nombre.
                 espera = config.RESPIRO if self.borrador else config.ESPERA_ORDEN
-                if self.pendientes.empty() and self.lleva > espera:
+                callado = time.time() - max(self.ultima_voz, self.desde)
+                if self.pendientes.empty() and callado > espera:
                     self.despacha()
 
             elif self.estado == OYENDO and self.tecla and self.lleva > config.GRABACION_MAX:
