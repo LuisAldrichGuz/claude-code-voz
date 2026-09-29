@@ -11,21 +11,32 @@ import wave
 from voz.control import config
 
 SONIDOS = config.RAIZ / "sonidos"
-TONOS = {"despierto": (880, 0.12), "dormido": (440, 0.12), "listo": (660, 0.1)}
+# Cada aviso es un arpegio corto de (frecuencia, segundos), como los de una consola.
+TONOS = {
+    "despierto": ((660, 0.05), (880, 0.05), (1320, 0.07)),   # te oigo: sube
+    "dormido":   ((660, 0.05), (440, 0.05), (330, 0.09)),    # me duermo: baja
+    "listo":     ((880, 0.05), (1175, 0.07)),                # hecho: dos notas
+}
 
 
 def prepara_sonidos():
-    """Genera los tres tonos la primera vez. Son senos cortos, no hacen falta assets."""
+    """Genera los tres avisos la primera vez. Son de 8 bits a proposito: onda cuadrada
+    y arpegios cortos, como un videojuego, que es la estetica que le gusta a Luis."""
     SONIDOS.mkdir(parents=True, exist_ok=True)
-    for nombre, (hz, dur) in TONOS.items():
+    for nombre, notas in TONOS.items():
         destino = SONIDOS / f"{nombre}.wav"
         if destino.exists():
             continue
         tasa, muestras = 44100, []
-        total = int(tasa * dur)
-        for i in range(total):
-            desvanece = min(1.0, (total - i) / (tasa * 0.03))  # cola suave, sin chasquido
-            muestras.append(int(12000 * desvanece * math.sin(2 * math.pi * hz * i / tasa)))
+        for hz, dur in notas:
+            total = int(tasa * dur)
+            for i in range(total):
+                # Cuadrada pura, sin filtrar: eso es lo que le da el sonido a consola.
+                ciclo = 1.0 if (i * hz // tasa) % 2 else -1.0
+                # Baja en escalones, no suave: un fundido continuo suena moderno.
+                escalon = 1.0 - (i / total)
+                muestras.append(int(7000 * ciclo * (int(escalon * 4) + 1) / 5))
+            muestras.extend([0] * int(tasa * 0.012))   # silencio entre notas
         with wave.open(str(destino), "wb") as w:
             w.setnchannels(1)
             w.setsampwidth(2)
