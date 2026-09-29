@@ -5,9 +5,11 @@ tenerla al frente. Aqui los agentes viven en una sesion tmux propia: les llega l
 que dictas aunque estes en el navegador, y el maestro puede abrir mas agentes el
 mismo (una ventana tmux por cada uno).
 """
+import json
 import os
 import subprocess
 import time
+from pathlib import Path
 
 SESION = "voz"
 MAESTRO = "maestro"
@@ -129,3 +131,44 @@ def destino(nombre=None):
         if n.lower().startswith(pista):
             return f"{SESION}:{n}"
     return f"{SESION}:{vivos[0]}"
+
+
+def pid_del_maestro():
+    """PID del proceso `claude` que corre en la ventana del maestro."""
+    panel = _tmux("list-panes", "-t", f"{SESION}:1", "-F", "#{pane_pid}")
+    if panel.returncode != 0:
+        return None
+    raiz = panel.stdout.strip().splitlines()
+    if not raiz:
+        return None
+    hijos = subprocess.run(["pgrep", "-P", raiz[0]], capture_output=True, text=True)
+    for pid in hijos.stdout.split():
+        orden = Path(f"/proc/{pid}/comm")
+        try:
+            if orden.read_text().strip() == "claude":
+                return int(pid)
+        except OSError:
+            continue
+    return None
+
+
+def estado_oficial():
+    """Lo que Claude Code dice de si mismo: 'busy', 'waiting', 'idle' o None.
+
+    `claude agents --json` es la via documentada para preguntarle a Claude Code por sus
+    sesiones. Sirve de red: las marcas de los hooks son instantaneas pero se pueden
+    quedar pegadas -si lo interrumpes con Escape, el hook de fin no llega a correr-.
+    """
+    pid = pid_del_maestro()
+    if not pid:
+        return None
+    salida = subprocess.run(["claude", "agents", "--json"], capture_output=True, text=True)
+    if salida.returncode != 0:
+        return None
+    try:
+        for agente in json.loads(salida.stdout):
+            if agente.get("pid") == pid:
+                return agente.get("status")
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return None

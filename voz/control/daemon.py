@@ -59,6 +59,7 @@ class Asistente:
         self.ultimo_texto = ""
         self.ultimo_uso = time.time()
         self.ultima_voz = 0.0    # ultima vez que se te oyo algo, para no cerrarte el turno
+        self.ultima_consulta = 0.0
         self.turno_whisper = threading.Lock()
         self.vivo = True
 
@@ -304,10 +305,24 @@ class Asistente:
 
         Mirando el tmux se fallaba siempre: entre una herramienta y la siguiente el
         prompt reaparece un instante y se daba el turno por terminado, asi que el punto
-        se apagaba a media faena y parecia que no habia hecho caso. Sus hooks marcan el
-        principio (`UserPromptSubmit`) y el final (`Stop`) del turno, sin adivinar.
+        se apagaba a media faena y parecia que no habia hecho caso.
+
+        Mandan sus hooks -`UserPromptSubmit` enciende la marca y `Stop` la apaga-, que
+        son instantaneos. Y cada dos segundos se contrasta con `claude agents --json`,
+        que es la via documentada para preguntarle por sus sesiones: si lo interrumpes
+        con Escape, el hook de fin no llega a correr y la marca se quedaria encendida
+        para siempre.
         """
-        return config.TRABAJANDO.exists() or config.HABLANDO.exists()
+        if config.HABLANDO.exists():
+            return True
+        marca = config.TRABAJANDO.exists()
+        ahora = time.time()
+        if marca and ahora - self.ultima_consulta > 2.0:
+            self.ultima_consulta = ahora
+            if sesion.estado_oficial() == "idle":
+                config.TRABAJANDO.unlink(missing_ok=True)
+                return False
+        return marca
 
     # --- hilo MIRILLA: reconocerte el nombre EN VIVO -------------------------
     def mira(self):
