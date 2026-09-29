@@ -8,6 +8,8 @@ import onnxruntime
 
 from voz.control import config
 
+CONTEXTO = 64   # muestras del frame anterior que el modelo exige ver
+
 
 class VozHumana:
     """Devuelve, por cada frame de 32 ms, la probabilidad de que sea voz (0 a 1)."""
@@ -24,13 +26,20 @@ class VozHumana:
     def reinicia(self):
         """Olvida lo anterior. Cada frase empieza limpia o arrastra el estado de la previa."""
         self.estado = np.zeros((2, 1, 128), dtype=np.float32)
+        self.contexto = np.zeros((1, CONTEXTO), dtype=np.float32)
 
     def probabilidad(self, frame):
         muestras = np.frombuffer(frame, dtype=np.int16).astype(np.float32) / 32768.0
         if len(muestras) != config.MUESTRAS_FRAME:
             return 0.0
+        # El modelo v5 quiere el frame CON las ultimas 64 muestras del anterior pegadas
+        # delante. Sin ese contexto contesta casi siempre que no hay nadie hablando: con
+        # voz clarisima daba 0.16 donde deberia dar 0.99, y el asistente no reaccionaba
+        # jamas sin la tecla.
+        entrada = np.concatenate([self.contexto, muestras.reshape(1, -1)], axis=1)
+        self.contexto = entrada[:, -CONTEXTO:]
         salida, self.estado = self.sesion.run(
-            None, {"input": muestras.reshape(1, -1),
+            None, {"input": entrada,
                    "state": self.estado,
                    "sr": np.array(config.TASA, dtype=np.int64)})
         return float(salida[0][0])
