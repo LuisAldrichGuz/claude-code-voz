@@ -305,7 +305,11 @@ class Asistente:
     # --- lo que pinta la isla ---------------------------------------------
     def late(self, fase=None, nivel=0.0):
         if fase is None:
-            if self.trabajando:
+            if self.borrador and time.time() < self.borrador_hasta:
+                # El respiro: todavia puedes seguir hablando y sigue siendo el mismo
+                # mensaje. Sin marcarlo no hay forma de saber si ya se fue o no.
+                fase = "respiro"
+            elif self.trabajando:
                 fase = "pensando"
             elif config.HABLANDO.exists():
                 fase = "hablando"

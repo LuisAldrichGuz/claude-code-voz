@@ -29,7 +29,7 @@ MARGEN = 12        # separacion de la esquina
 # "oyendo" NO esta aqui a proposito: con una tele o un juego de fondo el detector de voz
 # esta abierto casi todo el rato, y la pastilla se quedaba encendida en cian para siempre.
 # Lo que importa ver es cuando algo va a llegar de verdad.
-ACTIVAS = ("grabando", "pensando", "hablando")
+ACTIVAS = ("grabando", "respiro", "pensando", "hablando")
 
 
 class Punto(Gtk.DrawingArea):

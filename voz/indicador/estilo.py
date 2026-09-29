@@ -7,6 +7,7 @@ FASES = {
     "esperando":  ("#7c8797", False),   # listo: aprieta la tecla y habla
     "oyendo":     ("#22d3ee", True),    # sin tecla: oye una frase, vale si trae el nombre
     "grabando":   ("#34d399", True),    # tienes la tecla apretada, te esta grabando
+    "respiro":    ("#22d3ee", True),    # te callaste: dos segundos por si sigues
     "pensando":   ("#fbbf24", True),    # transcribiendo lo que dijiste
     "hablando":   ("#a78bfa", True),    # leyendo en voz alta
 }
