@@ -271,36 +271,46 @@ class Asistente:
 
     # --- hilo VIGILAR: la pantalla y la VRAM ------------------------------
     def vigila(self):
+        despachado = 0.0
         lento = 0.0
         while self.vivo:
-            time.sleep(0.4)   # el respiro de tu mensaje se mide aqui: tiene que ser agil
-            if time.time() - lento > 2.0:
-                lento = time.time()
-            else:
-                if (self.borrador and not self.cortador.grabando
-                        and not self.trabajando and time.time() > self.borrador_hasta):
-                    self.despacha(" ".join(self.borrador))
+            time.sleep(0.4)
+            ahora = time.time()
+
+            # El respiro de tu mensaje se mide aqui, por eso el ciclo es corto. El
+            # candado importa: con este bloque duplicado en dos ramas del bucle, el
+            # mismo borrador se mandaba dos veces y te llegaba repetido el mensaje
+            # anterior.
+            with self.candado:
+                listo = (self.borrador and not self.cortador.grabando
+                         and not self.trabajando and ahora > self.borrador_hasta)
+                mensaje = " ".join(self.borrador) if listo else None
+                if listo:
                     self.borrador = []
-                continue
-            # Si interrumpes al agente con Escape, el hook que apaga el aviso nunca
-            # corre. La pantalla del agente es la unica verdad.
-            if estado.dialogo() and sesion.listo():
-                estado.calla_dialogo()
-            if (self.borrador and not self.cortador.grabando
-                    and not self.trabajando and time.time() > self.borrador_hasta):
-                self.despacha(" ".join(self.borrador))
-                self.borrador = []
-            if (self.grabando.is_set()
-                    and time.time() - self.apretada_desde > config.GRABACION_MAX):
+            if mensaje:
+                self.despacha(mensaje)
+                despachado = ahora
+
+            if self.grabando.is_set() and ahora - self.apretada_desde > config.GRABACION_MAX:
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  dictado cerrado por el tope")
                 self.cierra()
+            if not self.grabando.is_set() and not self.cortador.grabando:
+                self.late()
+
+            if ahora - lento < 2.0:
+                continue
+            lento = ahora
+            # Si interrumpes al agente con Escape, el hook que apaga el aviso nunca
+            # corre. La pantalla del agente es la unica verdad. Pero no en los primeros
+            # segundos: recien mandado el mensaje el agente todavia se ve en su prompt,
+            # y el punto de "trabajando" se apagaba antes de que se llegara a ver.
+            if ahora - despachado > 6.0 and estado.dialogo() and sesion.listo():
+                estado.calla_dialogo()
             # whisper ocupa ~2 GB de VRAM: sin usarse, que los suelte.
             if (self.transcriptor.vivo() and not self.grabando.is_set()
-                    and time.time() - self.ultimo_uso > config.VRAM_LIBRE_TRAS):
+                    and ahora - self.ultimo_uso > config.VRAM_LIBRE_TRAS):
                 self.transcriptor.detiene()
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  whisper dormido, VRAM libre")
-            if not self.grabando.is_set():
-                self.late()
 
     # --- lo que pinta la isla ---------------------------------------------
     def late(self, fase=None, nivel=0.0):
