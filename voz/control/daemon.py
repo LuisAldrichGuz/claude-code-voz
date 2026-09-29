@@ -39,6 +39,8 @@ class Asistente:
         self.ultimo_uso = time.time()
         self.apretada_desde = 0.0
         self.invocado_hasta = 0.0
+        self.borrador = []
+        self.borrador_hasta = 0.0
         self.trabajando = False
         self.vivo = True
 
@@ -201,7 +203,8 @@ class Asistente:
             self.trabajando = True
             self.pendientes.put((frase, True))
         elif self.cortador.grabando:
-            self.late(fase="oyendo", nivel=self.cortador.probabilidad)
+            # Verde, igual que con la tecla: lo unico que hace falta saber es si te oye.
+            self.late(fase="grabando", nivel=self.cortador.probabilidad)
 
     # --- hilo TRABAJAR: aqui si se puede tardar ---------------------------
     def trabaja(self):
@@ -232,19 +235,17 @@ class Asistente:
         if sin_tecla:
             llamado, resto = palabra_clave.separa_nombre(texto, donde_sea=True)
             if llamado:
-                # Acabas de invocarlo: lo que sigas diciendo un rato es la misma orden.
-                # Las frases se cortan cortas a proposito -con ruido continuo, una de
-                # veinte segundos sale vacia de whisper-, asi que una orden larga llega
-                # partida y solo el primer pedazo lleva el nombre.
-                self.invocado_hasta = time.time() + config.SEGUIR
                 texto = resto.strip()
-            elif time.time() < self.invocado_hasta:
-                self.invocado_hasta = time.time() + config.SEGUIR
-            else:
+            elif not self.borrador:
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  sin el nombre, no se entrego")
                 return
-            if not texto:
-                return
+            # Todo lo que digas de corrido es UN mensaje: las frases se cortan a los
+            # ocho segundos por como funciona whisper, no porque hayas terminado. Sale
+            # junto cuando te callas de verdad.
+            if texto:
+                self.borrador.append(texto)
+            self.borrador_hasta = time.time() + config.RESPIRO
+            return
         self.ultimo_texto = texto
         primera = texto.lower().split()[:1]
         if primera and primera[0].strip(",.") in ("escribe", "dicta", "teclea"):
@@ -253,6 +254,11 @@ class Asistente:
             if resto and teclado.escribe(resto):
                 teclado.enter()
             return
+        self.despacha(texto)
+
+    def despacha(self, texto):
+        """Manda el mensaje al agente."""
+        self.ultimo_texto = texto
         entregado = envio.envia(texto)
         estado.apunta(f"{time.strftime('%H:%M:%S')}  "
                       f"{'AL AGENTE' if entregado else 'NO SE ENTREGÓ'}: {texto!r}")
@@ -265,12 +271,25 @@ class Asistente:
 
     # --- hilo VIGILAR: la pantalla y la VRAM ------------------------------
     def vigila(self):
+        lento = 0.0
         while self.vivo:
-            time.sleep(2.0)
+            time.sleep(0.4)   # el respiro de tu mensaje se mide aqui: tiene que ser agil
+            if time.time() - lento > 2.0:
+                lento = time.time()
+            else:
+                if (self.borrador and not self.cortador.grabando
+                        and not self.trabajando and time.time() > self.borrador_hasta):
+                    self.despacha(" ".join(self.borrador))
+                    self.borrador = []
+                continue
             # Si interrumpes al agente con Escape, el hook que apaga el aviso nunca
             # corre. La pantalla del agente es la unica verdad.
             if estado.dialogo() and sesion.listo():
                 estado.calla_dialogo()
+            if (self.borrador and not self.cortador.grabando
+                    and not self.trabajando and time.time() > self.borrador_hasta):
+                self.despacha(" ".join(self.borrador))
+                self.borrador = []
             if (self.grabando.is_set()
                     and time.time() - self.apretada_desde > config.GRABACION_MAX):
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  dictado cerrado por el tope")

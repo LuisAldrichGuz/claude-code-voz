@@ -32,7 +32,7 @@ SILENCIO_CIERRE = 1.4  # silencio que cierra una frase corta
 SILENCIO_LARGO = 2.4   # el que se exige cuando ya llevas rato hablando
 FRASE_LARGA = 3.5      # a partir de aqui la frase cuenta como larga
 ENUNCIADO_MAX = 8.0    # corte duro: con ruido continuo las frases largas salen vacias
-SEGUIR = 12.0          # tras invocarlo, este rato admite frases sin repetir el nombre
+RESPIRO = 2.0          # silencio que cierra TU mensaje; antes de eso sigue siendo el mismo
 
 # --- manos libres: la palabra de activacion ---
 # CADA frase tiene que empezar con el nombre. Sin ventanas ni sesiones abiertas: eso fue
