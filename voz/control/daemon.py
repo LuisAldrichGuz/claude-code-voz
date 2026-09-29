@@ -213,7 +213,14 @@ class Asistente:
         frase = self.cortador.empuja(frame)
         if frase is not None:
             self.pendientes.put((frase, True))
-            self.pasa_a(RESPIRO if self.borrador else DORMIDO)
+            # Si el turno ya estaba abierto SIGUE abierto, aunque todavia no haya nada
+            # guardado: diciendo solo el nombre y arrancando a hablar, al cerrar esa
+            # primera frase el estado se caia a dormido y lo que seguia se tiraba por
+            # no llevar el nombre.
+            if self.estado in (OYENDO, RESPIRO):
+                self.pasa_a(RESPIRO)
+            else:
+                self.pasa_a(DORMIDO)
         if self.cortador.grabando:
             self.ultima_voz = time.time()
         if frase is None and self.cortador.grabando and self.estado in (RESPIRO, OYENDO):
