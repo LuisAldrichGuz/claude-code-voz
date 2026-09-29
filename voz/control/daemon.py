@@ -39,6 +39,7 @@ class Asistente:
         self.ultimo_uso = time.time()
         self.apretada_desde = 0.0
         self.invocado_hasta = 0.0
+        self.mi_turno_desde = 0.0   # mientras el agente contesta, el micro no oye
         self.borrador = []
         self.borrador_hasta = 0.0
         self.trabajando = False
@@ -191,6 +192,29 @@ class Asistente:
                         self.audio += frame
                     self.late(fase="grabando", nivel=_fuerza(frame))
 
+    def mi_turno(self):
+        """True mientras el agente esta pensando o leyendo su respuesta.
+
+        La conversacion es uno a uno: hasta que no acaba de contestar de viva voz, lo
+        que se diga no cuenta. Si no, se le encima una peticion a la anterior -y con un
+        microfono abierto se cuela ademas cualquier cosa que suene en el cuarto-.
+        """
+        if not self.mi_turno_desde:
+            return False
+        ahora = time.time()
+        if ahora - self.mi_turno_desde > config.TURNO_MAX:
+            self.mi_turno_desde = 0.0     # algo se atoro; no dejarlo sordo para siempre
+            return False
+        if config.HABLANDO.exists():
+            return True
+        # Los primeros segundos el agente todavia se ve en su prompt aunque ya le llego.
+        if ahora - self.mi_turno_desde < 6.0:
+            return True
+        if sesion.listo() and not estado.dialogo():
+            self.mi_turno_desde = 0.0
+            return False
+        return True
+
     def manos_libres(self, frame):
         """Sin tecla: se oye siempre, pero CADA frase tiene que empezar con el nombre.
 
@@ -198,6 +222,11 @@ class Asistente:
         dejaba entrar los dialogos de un juego durante horas: bastaba con que algo
         abriera la sesion una vez para que todo lo que sonara despues entrara solo.
         """
+        if self.mi_turno():
+            # Ni se graba: es la unica forma de que no se le cuele el cuarto entero
+            # mientras contesta.
+            self.cortador.reinicia()
+            return
         frase = self.cortador.empuja(frame)
         if frase is not None:
             self.trabajando = True
@@ -261,8 +290,9 @@ class Asistente:
         self.despacha(texto)
 
     def despacha(self, texto):
-        """Manda el mensaje al agente."""
+        """Manda el mensaje al agente y le cede el turno."""
         self.ultimo_texto = texto
+        self.mi_turno_desde = time.time()
         entregado = envio.envia(texto)
         estado.apunta(f"{time.strftime('%H:%M:%S')}  "
                       f"{'AL AGENTE' if entregado else 'NO SE ENTREGÓ'}: {texto!r}")
