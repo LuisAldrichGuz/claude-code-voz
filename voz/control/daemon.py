@@ -211,7 +211,11 @@ class Asistente:
         if frase is not None:
             self.pendientes.put((frase, True))
             self.pasa_a(RESPIRO if self.borrador else DORMIDO)
-        elif self.cortador.grabando:
+        elif self.cortador.grabando and self.borrador:
+            # El verde solo DESPUES de que se te reconocio el nombre. Encenderlo con
+            # cualquier voz que el detector oyera era mentir: con alguien hablando de
+            # fondo parecia que te estaba atendiendo, y no le estaba haciendo caso a
+            # nadie. Hasta que no se transcribe la frase no se sabe si eras tu.
             self.pasa_a(OYENDO)
             self.late(nivel=self.cortador.probabilidad)
 
