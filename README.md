@@ -4,6 +4,11 @@ Asistente de voz **100 % local** para [Claude Code](https://claude.com/claude-co
 Linux/Wayland. Le hablas, te escucha, y su respuesta te la lee en voz alta. Nada de audio
 sale de la máquina: transcribe con whisper.cpp en la GPU y habla con piper.
 
+> **Solo Linux con Wayland.** No es multiplataforma y no va a serlo: se apoya en
+> layer-shell del compositor para el indicador, en PipeWire/PulseAudio para el audio, en
+> tmux para la sesión del agente y en `wtype` para teclear. En Windows o macOS no corre.
+> Probado en Hyprland; en otro compositor Wayland con soporte de layer-shell debería ir.
+
 No teclea en la ventana que tengas enfrente: lo dictado va a un Claude Code «maestro» que
 vive en una sesión de tmux, así que le llegas estés donde estés — en el navegador, en un
 juego o en otra terminal.
@@ -73,8 +78,9 @@ leería sus respuestas en voz alta y acabarían hablando todos encima.
 
 ## Instalación
 
-Hace falta Linux con Wayland, Python 3.11+, una GPU NVIDIA para whisper (funciona en CPU,
-más lento), y `tmux`, `parec`/`paplay` (PipeWire o PulseAudio), `grim`, `wtype`.
+**Requisitos:** Linux con Wayland (compositor con layer-shell), Python 3.11+, y una GPU
+NVIDIA para whisper — funciona en CPU, bastante más lento. Paquetes: `tmux`, `grim`,
+`wtype`, GTK4 con `gtk4-layer-shell`, y `parec`/`paplay` de PipeWire o PulseAudio.
 
 ```bash
 git clone <este-repo> voz && cd voz
