@@ -211,7 +211,7 @@ class Asistente:
         if frase is not None:
             self.pendientes.put((frase, True))
             self.pasa_a(RESPIRO if self.borrador else DORMIDO)
-        elif self.cortador.grabando and self.borrador:
+        elif self.cortador.grabando and self.estado in (RESPIRO, OYENDO):
             # El verde solo DESPUES de que se te reconocio el nombre. Encenderlo con
             # cualquier voz que el detector oyera era mentir: con alguien hablando de
             # fondo parecia que te estaba atendiendo, y no le estaba haciendo caso a
@@ -251,7 +251,7 @@ class Asistente:
             llamado, resto = palabra_clave.separa_nombre(texto, donde_sea=True)
             if llamado:
                 texto = resto.strip()
-            elif not self.borrador:
+            elif self.estado not in (RESPIRO, OYENDO):
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  sin el nombre, no se entrego")
                 self.pasa_a(DORMIDO)
                 return
@@ -308,7 +308,11 @@ class Asistente:
                 self.pasa_a(HABLANDO)
 
             if self.estado == RESPIRO and not self.tecla and not self.cortador.grabando:
-                if self.pendientes.empty() and self.lleva > config.RESPIRO:
+                # Si solo dijiste el nombre, el respiro es mas largo: dos segundos
+                # no alcanzan para invocarlo y ponerse a hablar, y se cerraba el turno
+                # antes de que empezaras.
+                espera = config.RESPIRO if self.borrador else config.ESPERA_ORDEN
+                if self.pendientes.empty() and self.lleva > espera:
                     self.despacha()
 
             elif self.estado == OYENDO and self.tecla and self.lleva > config.GRABACION_MAX:

@@ -33,6 +33,7 @@ SILENCIO_LARGO = 2.4   # el que se exige cuando ya llevas rato hablando
 FRASE_LARGA = 3.5      # a partir de aqui la frase cuenta como larga
 ENUNCIADO_MAX = 8.0    # corte duro: con ruido continuo las frases largas salen vacias
 RESPIRO = 2.0          # silencio que cierra TU mensaje; antes de eso sigue siendo el mismo
+ESPERA_ORDEN = 6.0     # tras invocarlo a secas, lo que espera a que arranques
 TURNO_MAX = 600.0      # tope del turno del agente, por si se atora y te deja sordo
 ENFRIA = 1.5           # sordo un momento tras callarse: la cola de audio sigue sonando
 
