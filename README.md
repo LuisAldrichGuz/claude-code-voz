@@ -1,0 +1,110 @@
+# voz — dictado y asistente de voz local
+
+Todo corre en esta maquina: nada de audio sale a internet.
+
+Es **aprieta para hablar**: mantienes la tecla **M5**, hablas, la sueltas y se manda.
+Nada se graba ni se transcribe sin la tecla.
+
+- **Oir**: whisper.cpp con CUDA (modelo `large-v3-turbo` en la RTX 5070). Sin usarse un
+  rato suelta sus ~2 GB de VRAM y vuelve al apretar.
+- **Escribir**: `wtype` teclea en la ventana enfocada, asi funciona con Claude Code,
+  el navegador o donde sea.
+- **Hablar**: piper con la voz `es_MX-claude-high`.
+
+### Por que no hay palabra de activacion
+
+La hubo, y no funcionaba. Con el microfono siempre abierto habia que adivinar si te
+hablaba a ti o a la tele, y eso se defendia con palabra clave comparada por parecido,
+ventanas de sesion, respiros, rescates y topes: ocho tiempos distintos peleandose entre
+si. Con un juego puesto se seguian colando sus dialogos como ordenes, y el nombre
+-"Claude"- salia transcrito como "Claro". **Apretar una tecla no se adivina.**
+
+## Como se usa
+
+| Accion | Como |
+|---|---|
+| Hablarle sin soltar la tecla | **toca** la M5, habla, **tocala otra vez** para mandar |
+| Algo corto | **manten** la M5 apretada, habla, sueltala |
+| A donde va | a tu Claude maestro en tmux, estes en la ventana que estes |
+| Dictar en otro lado | empieza con "escribe": va a la ventana que tengas enfrente |
+| Interrumpir la lectura | pica la pastilla |
+| Apagarlo en una junta | **SUPER+ALT+M5**: sale el aviso "Chat de voz desactivado" |
+| Ver al maestro | `voz ver` · `voz agentes` los lista |
+| Ver que entendio | la isla · `voz log` · `voz oir` |
+
+Apagado, el microfono se cierra de verdad y whisper suelta la VRAM. La tecla no hace nada.
+
+### Lo que dice el punto
+
+Es lo unico que se ve en pantalla, arriba a la derecha:
+
+| Color | Que pasa |
+|---|---|
+| gris claro | listo; aprieta y habla |
+| verde | tienes la tecla apretada, te esta grabando |
+| ambar | transcribiendo, o el agente trabajando |
+| morado | leyendo en voz alta |
+| gris oscuro | apagado; la tecla no hace nada |
+
+## Estructura
+
+    voz/escucha/        el microfono (y elegir la fuente sin eco)
+    voz/transcripcion/  cliente de whisper-server
+    voz/agentes/        la sesion tmux donde viven los Claude Code
+    voz/dictado/        teclea en la ventana enfocada (solo si dices "escribe")
+    voz/habla/          piper + limpieza de markdown para que suene bien
+    voz/control/        configuracion, estado y el demonio
+    voz/indicador/      la isla en pantalla (GTK4 layer-shell, sin mako)
+    voz/claude_code/    hook que lee en voz alta la respuesta de Claude Code
+    docs/cuando-falla.md  reparacion por sintoma: leelo antes de tocar nada
+
+Los ajustes (umbrales del micro, nombre, tiempos) estan todos en
+`voz/control/config.py`.
+
+
+## Trampas que ya costaron caro
+
+1. **La tecla no puede lanzar Python.** `voz habla` arrancaba un interprete entero, unos
+   300 ms, y ese arranque se come el principio de la frase. La tecla llama a
+   `bin/voz-tecla`, que es bash y solo manda la senal: 3 ms.
+2. **El microfono se deja abierto, pero solo se GUARDA con la tecla apretada.** Abrirlo
+   justo al apretar se probo primero y `parec` tardaba metro y medio de segundo en
+   arrancar. Ademas hay `COLCHON` segundos de margen hacia atras, por si aprietas tarde.
+   Apagando el asistente el microfono se cierra de verdad: en una junta eso es lo unico
+   que vale, no confiar en que el programa decida bien.
+3. **Un audio mudo no se manda.** Whisper no devuelve vacio con silencio: se inventa un
+   "Gracias." o un "Subtitulos por la comunidad", y eso acabaria en el chat como una
+   orden. Por eso `MUDO`.
+4. **Poner un cancelador de eco delante de EasyEffects lo mete en un bucle.**
+   EasyEffects saca su salida al sink por DEFECTO; si ese es el cancelador, se manda el
+   audio a si mismo y la tarjeta se queda sin nada - suena todo bien en los medidores y
+   no sale una nota. Se quito: con la tecla no hace falta, porque el microfono solo
+   guarda mientras la aprietas.
+5. **Nunca grabar de `@DEFAULT_SOURCE@`.** En esta maquina el default se va solo al
+   `.monitor` de la salida: entonces se graba lo que suena por las bocinas y el
+   asistente *aparenta* funcionar mientras te ignora. `microfono.fuente_real()` elige
+   `voz_sin_eco`, y si no esta, una entrada ALSA de verdad.
+6. **El aviso de que el agente trabaja se apaga mirando su pantalla**, no esperando al
+   hook: si interrumpes a Claude Code con Escape ese hook nunca corre y el punto se
+   queda encendido para siempre.
+7. **La isla no vive en pantalla.** Sale SOLO mientras te atiende -grabando,
+   transcribiendo, leyendo- y se desvanece. Nada de asomar a cada cambio de estado: eso
+   dejaba un punto gris apareciendo sin que hubieras tocado nada. Encender y apagar lo
+   dice el OSD de Omarchy, el mismo del volumen. Y nada de notificaciones del sistema:
+   interrumpen encima de lo que estas leyendo.
+8. **La ventana tiene que ser transparente** (`window { background: transparent }`) o el
+   cuadro gris de GTK asoma por detras de las esquinas redondeadas. Y para que encoja al
+   quitarle el texto hay que pedirle el tamano minimo a mano; el label necesita
+   `width_chars` o se aplasta a dos letras por renglon.
+9. **Nunca escribirle a un agente que no esta en su prompt.** Si esta en un dialogo, el
+   Enter del dictado contesta ESE dialogo: asi murio el primer maestro, con el Enter
+   cayendo sobre "No, exit". `sesion.listo()` se revisa antes de cada envio.
+10. **La ventana de tmux corre un shell, no `claude` directo.** Si Claude se cae, la
+    ventana sobrevive y se puede ver que paso.
+11. **El hilo que lee el microfono no puede hacer NADA lento.** Transcribir y entregar
+    ahi dentro dejaba al microfono llenandose por detras: cada frase que llegaba era la
+    anterior. Van en hilos aparte (`graba` / `trabaja` / `vigila`).
+12. **Solo habla el maestro.** El hook esta puesto global, asi que sin comprobar en que
+    sesion corre, CUALQUIER Claude Code abierto lee sus respuestas en voz alta.
+13. **Si el agente esta ocupado, dilo.** Claude Code encola lo que le llega; sin
+    mostrarlo, parece que el asistente contesta lo del mensaje anterior.

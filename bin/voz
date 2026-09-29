@@ -1,0 +1,132 @@
+#!/home/luisaldrichguz/Projects/voz/.venv/bin/python
+"""voz — control del asistente de voz.
+
+  voz demonio   arranca el proceso (lo hace systemd al iniciar sesion)
+  voz habla     empieza a grabar   (se dispara al APRETAR la M5)
+  voz calla     cierra y lo manda  (al SOLTARLA)
+  voz toggle    enciende/apaga el asistente entero (en juntas)
+  voz on | off  fuerza uno de los dos
+  voz estado    en que anda
+  voz decir T   lee T en voz alta (lo usa el hook de Claude Code)
+  voz callate   corta lo que se este leyendo
+  voz log       ultimas frases que entendio
+  voz oir       muestra EN VIVO lo que va oyendo (Ctrl+C para salir)
+  voz ver       abre una terminal con tu Claude maestro
+  voz agentes   lista los agentes vivos
+  voz indicador la isla en pantalla que dice si te esta oyendo
+"""
+import os
+import signal
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from voz.control import config, estado  # noqa: E402
+
+
+def pid_vivo():
+    try:
+        pid = int(config.PID.read_text())
+        os.kill(pid, 0)
+        return pid
+    except (OSError, ValueError):
+        return None
+
+
+def manda(senal):
+    pid = pid_vivo()
+    if not pid:
+        print("El demonio no esta corriendo: systemctl --user start voz")
+        return 1
+    os.kill(pid, senal)
+    return 0
+
+
+def main():
+    orden = sys.argv[1] if len(sys.argv) > 1 else "estado"
+
+    if orden == "demonio":
+        from voz.control.daemon import main as corre
+        corre()
+        return 0
+
+    if orden == "habla":
+        return manda(signal.SIGUSR1)
+
+    if orden == "calla":
+        return manda(signal.SIGUSR2)
+
+    if orden == "toggle":
+        return manda(signal.SIGHUP)
+
+    if orden in ("on", "off"):
+        quiere = orden == "on"
+        if estado.escuchando() == quiere:
+            print(f"Ya estaba {'encendido' if quiere else 'apagado'}")
+            return 0
+        return manda(signal.SIGHUP)
+
+    if orden == "decir":
+        from voz.habla import piper_voz
+        texto = " ".join(sys.argv[2:]) or sys.stdin.read()
+        return 0 if piper_voz.di(texto) else 1
+
+    if orden == "callate":
+        from voz.habla import piper_voz
+        piper_voz.callate()
+        return 0
+
+    if orden == "ver":
+        from voz.agentes import envio, sesion
+        sesion.asegura()
+        envio.ver(sys.argv[2] if len(sys.argv) > 2 else None)
+        return 0
+
+    if orden == "agentes":
+        from voz.agentes import sesion
+        vivos = sesion.agentes()
+        if not vivos:
+            print("Ninguno. Se crea solo al primer dictado, o con: voz ver")
+            return 0
+        for i, n in enumerate(vivos):
+            print(f"  {n}{'   <- maestro' if i == 0 else ''}")
+        return 0
+
+    if orden == "indicador":
+        # gtk4-layer-shell tiene que cargarse ANTES que libwayland o la ventana
+        # nace como ventana normal y el compositor no la ancla. Por eso el
+        # proceso se relanza a si mismo una sola vez con la libreria precargada.
+        precarga = "/usr/lib/libgtk4-layer-shell.so"
+        if precarga not in os.environ.get("LD_PRELOAD", ""):
+            entorno = dict(os.environ, LD_PRELOAD=precarga)
+            os.execve(sys.executable, [sys.executable, __file__, "indicador"], entorno)
+        from voz.indicador.ventana import main as isla
+        isla()
+        return 0
+
+    if orden == "oir":
+        import subprocess
+        config.REGISTRO.parent.mkdir(parents=True, exist_ok=True)
+        config.REGISTRO.touch()
+        print(f'Micro: {"ENCENDIDO" if estado.escuchando() else "APAGADO"}. Habla; Ctrl+C para salir.')
+        try:
+            subprocess.run(["tail", "-n", "5", "-f", str(config.REGISTRO)])
+        except KeyboardInterrupt:
+            pass
+        return 0
+
+    if orden == "log":
+        if config.REGISTRO.exists():
+            print("".join(config.REGISTRO.read_text().splitlines(True)[-20:]), end="")
+        return 0
+
+    pid = pid_vivo()
+    print(f"demonio : {'vivo (pid ' + str(pid) + ')' if pid else 'apagado'}")
+    print(f"microfono: {'ENCENDIDO' if estado.escuchando() else 'apagado'}")
+    print(f"hablando : {'si' if config.HABLANDO.exists() else 'no'}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

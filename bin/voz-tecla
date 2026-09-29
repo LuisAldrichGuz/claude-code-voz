@@ -1,0 +1,17 @@
+#!/bin/bash
+# La tecla de hablar, en bash y no en python: `voz habla` arrancaba un interprete
+# entero -unos 300 ms- y ese arranque se come el principio de la frase. Aqui solo se
+# le manda la senal al demonio, que son milisegundos.
+#
+#   voz-tecla habla   al APRETAR la M5    (SIGUSR1)
+#   voz-tecla calla   al SOLTARLA         (SIGUSR2)
+pid_file="${XDG_RUNTIME_DIR:-/tmp}/voz/daemon.pid"
+[[ -r $pid_file ]] || exit 0
+
+case "$1" in
+  habla) senal=USR1 ;;
+  calla) senal=USR2 ;;
+  *) echo "uso: voz-tecla habla|calla" >&2; exit 2 ;;
+esac
+
+kill -"$senal" "$(<"$pid_file")" 2>/dev/null || exit 0
