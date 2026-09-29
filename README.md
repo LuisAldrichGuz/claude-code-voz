@@ -1,140 +1,151 @@
-# voz — dictado y asistente de voz local
+# voz — háblale a Claude Code, y que te conteste
 
-Todo corre en esta maquina: nada de audio sale a internet.
+Asistente de voz **100 % local** para [Claude Code](https://claude.com/claude-code) en
+Linux/Wayland. Le hablas, te escucha, y su respuesta te la lee en voz alta. Nada de audio
+sale de la máquina: transcribe con whisper.cpp en la GPU y habla con piper.
 
-Dos formas de hablarle, la que te acomode:
+No teclea en la ventana que tengas enfrente: lo dictado va a un Claude Code «maestro» que
+vive en una sesión de tmux, así que le llegas estés donde estés — en el navegador, en un
+juego o en otra terminal.
 
-- **Manos libres**: empiezas la frase con **"Claudio"** y sigues hablando.
-- **Con la tecla**: mantienes la **M5** apretada y dictas lo que quieras sin nombrarlo.
+![oyéndote](docs/img/verde-oyendo.png)
 
-- **Oir**: whisper.cpp con CUDA (modelo `large-v3-turbo` en la RTX 5070). Sin usarse un
-  rato suelta sus ~2 GB de VRAM y vuelve al apretar.
-- **Escribir**: `wtype` teclea en la ventana enfocada, asi funciona con Claude Code,
-  el navegador o donde sea.
-- **Hablar**: piper con la voz `es_MX-claude-high`.
+---
 
-### Como se comporta sin la tecla
+## Cómo se le habla
 
-Dices **"Claudio"** y a partir de ahi:
+Dos formas, la que acomode:
 
-- **verde** mientras te oye;
-- **cian** los dos segundos de respiro cuando callas: mientras este cian sigues en el
-  MISMO mensaje, puedes tomar aire y seguir;
-- se manda cuando te callas de verdad.
-
-Todo lo que digas de corrido sale como **un solo mensaje**. Las frases se cortan a los
-ocho segundos por como funciona whisper, no porque hayas terminado: mandando cada pedazo
-por separado, una instruccion larga llegaba partida e interrumpia a la anterior.
-
-**Hace falta el nombre para empezar.** No hay ventanas, ni sesiones que se
-queden abiertas, ni respiros: eso fue lo que dejaba entrar los dialogos de un juego
-durante horas, porque bastaba con que algo abriera la sesion una vez para que todo lo
-que sonara despues entrara solo.
-
-Y el nombre es "Claudio" y no "Claude" porque whisper transcribe en espanol: "Claude" le
-salia "Claro" o "Cloud", y "Claro" es palabra comun. Para dictar largo sin repetirlo en
-cada frase esta la tecla.
-
-## Como se usa
-
-| Accion | Como |
+| | |
 |---|---|
-| Hablarle sin tocar nada | empieza la frase con **"Claudio"** |
-| Dictar largo | **manten** la M5 apretada, habla, sueltala |
-| A donde va | a tu Claude maestro en tmux, estes en la ventana que estes |
-| Dictar en otro lado | empieza con "escribe": va a la ventana que tengas enfrente |
-| Interrumpir la lectura | pica la pastilla |
-| Apagarlo en una junta | **SUPER+ALT+M5**: sale el aviso "Chat de voz desactivado" |
-| Ver al maestro | `voz ver` · `voz agentes` los lista |
-| Ver que entendio | la isla · `voz log` · `voz oir` |
+| **Manos libres** | empiezas la frase con **«Claudio»** y hablas |
+| **Con tecla** | mantienes una tecla apretada y dictas sin nombrarlo |
 
-Apagado, el microfono se cierra de verdad y whisper suelta la VRAM. La tecla no hace nada.
+Todo lo que digas de corrido sale como **un solo mensaje**. Las frases se cortan por cómo
+funciona el reconocimiento, no porque hayas terminado: mandando cada pedazo por separado,
+una instrucción larga llegaba partida e interrumpía a la anterior.
 
-### Lo que dice el punto
+Y la conversación es **uno a uno**: desde que se manda tu mensaje hasta que termina de
+leerte la respuesta, el micrófono no graba nada. Ni tu voz ni lo que suene en el cuarto.
 
-Es lo unico que se ve en pantalla, arriba a la derecha:
+## Un punto, y todo el estado
 
-| Color | Que pasa |
+Lo único que vive en pantalla es un punto arriba a la derecha. Sale cuando te atiende y se
+desvanece; nada de notificaciones tapando lo que lees.
+
+| | Estado |
 |---|---|
-| gris claro | listo; di "Claudio" o aprieta la tecla |
-| cian | te callaste: dos segundos por si sigues, es el mismo mensaje |
-| verde | tienes la tecla apretada, te esta grabando |
-| ambar | transcribiendo, o el agente trabajando |
-| morado | leyendo en voz alta |
-| gris oscuro | apagado; la tecla no hace nada |
+| ![](docs/img/verde-oyendo.png) | **verde** — te reconoció el nombre y te está grabando |
+| ![](docs/img/cian-respiro.png) | **cian** — te callaste; unos segundos por si sigues, es el mismo mensaje |
+| ![](docs/img/ambar-pensando.png) | **ámbar** — transcribiendo, o el agente trabajando |
+| ![](docs/img/morado-hablando.png) | **morado** — leyendo la respuesta; el micrófono está cerrado |
+
+El verde **solo** se enciende después de reconocerte el nombre. Encenderlo con cualquier
+voz que el detector oyera era mentir: con alguien hablando de fondo parecía que te estaba
+atendiendo, y no le hacía caso a nadie.
+
+## Qué usa
+
+| Pieza | Para qué |
+|---|---|
+| [whisper.cpp](https://github.com/ggerganov/whisper.cpp) (`large-v3-turbo`, CUDA) | pasar tu voz a texto; suelta la VRAM cuando no se usa |
+| [Silero VAD](https://github.com/snakers4/silero-vad) | saber si lo que suena es una persona hablando, no medir volumen |
+| [piper](https://github.com/rhasspy/piper) | leer la respuesta en voz alta |
+| GTK4 + layer-shell | el punto en pantalla, sin depender del daemon de notificaciones |
+| tmux | donde vive el Claude Code maestro |
+
+## Cómo sabe si el agente sigue trabajando
+
+Esto es lo que más costó. Mirando la pantalla de tmux se falla siempre: entre una
+herramienta y la siguiente el prompt reaparece un instante y se da el turno por terminado
+— el punto se apaga a media faena y parece que no hizo caso.
+
+Claude Code lo dice él mismo, por dos vías que se complementan:
+
+- **Sus hooks.** `UserPromptSubmit` enciende una marca y `Stop` la apaga. Instantáneo.
+- **`claude agents --json`.** La vía documentada para preguntarle por sus sesiones;
+  devuelve `busy`, `waiting` o `idle`. Se consulta cada dos segundos como red, porque si
+  interrumpes al agente con `Esc` el hook de fin nunca llega a correr.
+
+El hook de lectura también decide **qué sesión habla**: solo la que vive en la ventana de
+tmux del maestro. Los hooks son globales, así que sin eso cualquier Claude Code abierto
+leería sus respuestas en voz alta y acabarían hablando todos encima.
+
+## Instalación
+
+Hace falta Linux con Wayland, Python 3.11+, una GPU NVIDIA para whisper (funciona en CPU,
+más lento), y `tmux`, `parec`/`paplay` (PipeWire o PulseAudio), `grim`, `wtype`.
+
+```bash
+git clone <este-repo> voz && cd voz
+python -m venv .venv && .venv/bin/pip install onnxruntime numpy piper-tts
+
+# whisper.cpp con CUDA, y el modelo
+git clone https://github.com/ggerganov/whisper.cpp ../voz-whisper
+cmake -B ../voz-whisper/build -S ../voz-whisper -DGGML_CUDA=1 && cmake --build ../voz-whisper/build -j
+../voz-whisper/models/download-ggml-model.sh large-v3-turbo
+
+# la voz de piper (cualquiera de rhasspy/piper-voices)
+mkdir -p voces && curl -L -o voces/es_MX-claude-high.onnx <url-del-modelo>
+
+bin/voz demonio        # o instálalo como servicio de usuario
+```
+
+Luego, en `~/.claude/settings.json`, los dos hooks:
+
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [{ "hooks": [{ "type": "command",
+      "command": "python3 ~/voz/voz/claude_code/marca_turno.py 2>/dev/null || true" }] }],
+    "Stop": [{ "hooks": [{ "type": "command",
+      "command": "python3 ~/voz/voz/claude_code/lee_respuesta.py 2>/dev/null || true",
+      "async": true, "timeout": 120 }] }]
+  }
+}
+```
+
+Y la tecla, en tu compositor. En Hyprland, apretar y soltar:
+
+```
+bind  = , code:156, exec, ~/voz/bin/voz-tecla habla
+bindr = , code:156, exec, ~/voz/bin/voz-tecla calla
+bind  = SUPER ALT, code:156, exec, ~/voz/bin/voz toggle
+```
+
+El nombre con el que se le llama, los umbrales y los tiempos están todos en
+[`voz/control/config.py`](voz/control/config.py).
+
+## Comandos
+
+```
+voz habla | calla     empieza y cierra el dictado (los llama la tecla)
+voz toggle | on | off enciende o apaga el asistente entero
+voz estado            en qué anda
+voz log | oir         lo que entendió, y en vivo
+voz ver | agentes     abre el Claude maestro, o lista los que hay
+voz decir "texto"     léelo en voz alta
+```
+
+## Cuando algo falla
+
+[`docs/cuando-falla.md`](docs/cuando-falla.md) es una guía de reparación por síntoma. El
+registro (`voz log`) nombra el motivo de **cada** descarte, que fue la lección más cara de
+todas: callarse cuando algo no se entrega hace parecer que el programa está descompuesto.
 
 ## Estructura
 
-    voz/escucha/        el microfono (y elegir la fuente sin eco)
-    voz/transcripcion/  cliente de whisper-server
-    voz/agentes/        la sesion tmux donde viven los Claude Code
-    voz/dictado/        teclea en la ventana enfocada (solo si dices "escribe")
-    voz/habla/          piper + limpieza de markdown para que suene bien
-    voz/control/        configuracion, estado y el demonio
-    voz/indicador/      la isla en pantalla (GTK4 layer-shell, sin mako)
-    voz/claude_code/    hook que lee en voz alta la respuesta de Claude Code
-    docs/cuando-falla.md  reparacion por sintoma: leelo antes de tocar nada
+```
+voz/escucha/        el micrófono, el detector de voz y la palabra de activación
+voz/transcripcion/  cliente de whisper-server
+voz/agentes/        la sesión tmux donde vive el Claude Code maestro
+voz/dictado/        teclear en la ventana enfocada (solo si dices "escribe")
+voz/habla/          piper y la limpieza de markdown para que suene bien
+voz/control/        configuración, estado y el demonio (una máquina de estados)
+voz/indicador/      el punto en pantalla (GTK4 layer-shell)
+voz/claude_code/    los dos hooks: marcar el turno y leer la respuesta
+```
 
-Los ajustes (umbrales del micro, nombre, tiempos) estan todos en
-`voz/control/config.py`.
+## Licencia
 
-
-## Trampas que ya costaron caro
-
-1. **Whisper tiene que estar encendido pase lo que pase.** El vigilante lo apaga tras un
-   rato sin uso para soltar la VRAM, y durante un tiempo solo lo volvia a arrancar la
-   tecla: todo lo que se oia sin ella llegaba a un servidor caido y volvia como cadena
-   vacia. Se oia perfecto, la frase se cortaba bien, y no pasaba absolutamente nada.
-2. **Sin tecla, el nombre se busca en TODA la frase.** El detector abre la frase con el
-   ruido del cuarto y lo que dices se pega detras, asi que el nombre casi nunca cae en
-   las primeras palabras.
-3. **Silero v5 necesita el contexto del frame anterior** (64 muestras pegadas delante) o
-   contesta que no hay nadie hablando: con voz clarisima daba 0.16 donde debe dar 1.00.
-4. **Dos hilos no pueden escribir el mismo archivo temporal.** Uno renombraba y al otro
-   le estallaba FileNotFoundError, que se llevaba el hilo del microfono entero; el
-   demonio seguia "vivo" y el microfono "encendido", sordo y sin decir nada. Ahora cada
-   hilo usa el suyo y, si se cae, se levanta solo y lo deja escrito.
-5. **La tecla no puede lanzar Python.** `voz habla` arrancaba un interprete entero, unos
-   300 ms, y ese arranque se come el principio de la frase. La tecla llama a
-   `bin/voz-tecla`, que es bash y solo manda la senal: 3 ms.
-6. **El microfono se deja abierto, pero solo se GUARDA con la tecla apretada.** Abrirlo
-   justo al apretar se probo primero y `parec` tardaba metro y medio de segundo en
-   arrancar. Ademas hay `COLCHON` segundos de margen hacia atras, por si aprietas tarde.
-   Apagando el asistente el microfono se cierra de verdad: en una junta eso es lo unico
-   que vale, no confiar en que el programa decida bien.
-7. **Un audio mudo no se manda.** Whisper no devuelve vacio con silencio: se inventa un
-   "Gracias." o un "Subtitulos por la comunidad", y eso acabaria en el chat como una
-   orden. Por eso `MUDO`.
-8. **Poner un cancelador de eco delante de EasyEffects lo mete en un bucle.**
-   EasyEffects saca su salida al sink por DEFECTO; si ese es el cancelador, se manda el
-   audio a si mismo y la tarjeta se queda sin nada - suena todo bien en los medidores y
-   no sale una nota. Se quito: con la tecla no hace falta, porque el microfono solo
-   guarda mientras la aprietas.
-9. **Nunca grabar de `@DEFAULT_SOURCE@`.** En esta maquina el default se va solo al
-   `.monitor` de la salida: entonces se graba lo que suena por las bocinas y el
-   asistente *aparenta* funcionar mientras te ignora. `microfono.fuente_real()` elige
-   `voz_sin_eco`, y si no esta, una entrada ALSA de verdad.
-10. **El aviso de que el agente trabaja se apaga mirando su pantalla**, no esperando al
-   hook: si interrumpes a Claude Code con Escape ese hook nunca corre y el punto se
-   queda encendido para siempre.
-11. **La isla no vive en pantalla.** Sale SOLO mientras te atiende -grabando,
-   transcribiendo, leyendo- y se desvanece. Nada de asomar a cada cambio de estado: eso
-   dejaba un punto gris apareciendo sin que hubieras tocado nada. Encender y apagar lo
-   dice el OSD de Omarchy, el mismo del volumen. Y nada de notificaciones del sistema:
-   interrumpen encima de lo que estas leyendo.
-12. **La ventana tiene que ser transparente** (`window { background: transparent }`) o el
-   cuadro gris de GTK asoma por detras de las esquinas redondeadas. Y para que encoja al
-   quitarle el texto hay que pedirle el tamano minimo a mano; el label necesita
-   `width_chars` o se aplasta a dos letras por renglon.
-13. **Nunca escribirle a un agente que no esta en su prompt.** Si esta en un dialogo, el
-   Enter del dictado contesta ESE dialogo: asi murio el primer maestro, con el Enter
-   cayendo sobre "No, exit". `sesion.listo()` se revisa antes de cada envio.
-14. **La ventana de tmux corre un shell, no `claude` directo.** Si Claude se cae, la
-    ventana sobrevive y se puede ver que paso.
-15. **El hilo que lee el microfono no puede hacer NADA lento.** Transcribir y entregar
-    ahi dentro dejaba al microfono llenandose por detras: cada frase que llegaba era la
-    anterior. Van en hilos aparte (`graba` / `trabaja` / `vigila`).
-16. **Solo habla el maestro.** El hook esta puesto global, asi que sin comprobar en que
-    sesion corre, CUALQUIER Claude Code abierto lee sus respuestas en voz alta.
-17. **Si el agente esta ocupado, dilo.** Claude Code encola lo que le llega; sin
-    mostrarlo, parece que el asistente contesta lo del mensaje anterior.
+MIT. Los modelos que descargues traen la suya.

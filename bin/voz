@@ -1,4 +1,4 @@
-#!/home/luisaldrichguz/Projects/voz/.venv/bin/python
+#!/usr/bin/env python3
 """voz — control del asistente de voz.
 
   voz demonio   arranca el proceso (lo hace systemd al iniciar sesion)
@@ -19,6 +19,16 @@ import os
 import signal
 import sys
 from pathlib import Path
+
+# El proyecto trae su propio entorno (onnxruntime, numpy). Si este interprete no lo
+# tiene, se relanza con el del proyecto en vez de reventar con un ImportError.
+# Comparar el ejecutable no vale: el python del entorno es un enlace al del sistema y
+# los dos resuelven al mismo archivo. Lo que distingue es el prefijo.
+_ENTORNO = Path(__file__).resolve().parents[1] / ".venv"
+if (_ENTORNO / "bin" / "python").exists() and Path(sys.prefix) != _ENTORNO:
+    _python = str(_ENTORNO / "bin" / "python")
+    os.execv(_python, [_python, str(Path(__file__).resolve()), *sys.argv[1:]])
+
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

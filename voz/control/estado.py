@@ -21,7 +21,7 @@ TONOS = {
 
 def prepara_sonidos():
     """Genera los tres avisos la primera vez. Son de 8 bits a proposito: onda cuadrada
-    y arpegios cortos, como un videojuego, que es la estetica que le gusta a Luis."""
+    y arpegios cortos, como los de una consola."""
     SONIDOS.mkdir(parents=True, exist_ok=True)
     for nombre, notas in TONOS.items():
         destino = SONIDOS / f"{nombre}.wav"

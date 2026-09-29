@@ -3,10 +3,11 @@ import os
 from pathlib import Path
 
 CASA = Path.home()
-RAIZ = CASA / "Projects" / "voz"
+# La raiz se deduce del propio archivo: asi el proyecto se puede clonar donde sea.
+RAIZ = Path(__file__).resolve().parents[2]
 
 # --- whisper.cpp (compilado con CUDA para la RTX 5070) ---
-WHISPER = CASA / "Projects" / "voz-whisper"
+WHISPER = Path(os.environ.get("VOZ_WHISPER", RAIZ.parent / "voz-whisper"))
 WHISPER_SERVER = WHISPER / "build" / "bin" / "whisper-server"
 MODELO = WHISPER / "models" / "ggml-large-v3-turbo.bin"
 PUERTO = 8178
@@ -46,7 +47,7 @@ VARIANTES = ("claudio", "claudia", "clodio", "claudios", "cloudio", "glaudio",
              "claude", "clod", "cloud", "clau", "clode", "clot", "claud", "cloude",
              "clow", "gloud", "glod", "glaude", "glau")
 # Palabras que se parecen al nombre pero NUNCA lo son: "audio" va dentro de "claudio" y
-# Luis habla de audio a cada rato; "claro" era la otra que despertaba a media charla.
+# "audio" sale a cada rato en una charla tecnica; "claro" es de las palabras mas comunes.
 NO_ES_NOMBRE = ("audio", "claro", "clase", "clave", "cuadro", "aludio")
 
 # --- tiempos ---

@@ -173,7 +173,7 @@ def _a_rgb(hexa):
 
 
 def main():
-    app = Gtk.Application(application_id="net.luisaldrichguz.voz")
+    app = Gtk.Application(application_id="dev.voz.indicador")
 
     def arranca(a):
         hoja = Gtk.CssProvider()
