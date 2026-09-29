@@ -321,9 +321,13 @@ class Asistente:
                 elif self.lleva > config.TURNO_MAX:
                     # Algo se atoro; no dejarte sordo para siempre.
                     self.pasa_a(DORMIDO)
-                elif self.lleva > 6.0 and sesion.listo() and not estado.dialogo():
+                elif self.lleva > 6.0 and sesion.listo():
                     # Los primeros segundos el agente todavia se ve en su prompt aunque
-                    # ya le llego el mensaje.
+                    # ya le llego el mensaje. Y el aviso se apaga AQUI: esperar a estar
+                    # dormido para apagarlo era un nudo -no salia de pensando porque el
+                    # aviso seguia, y el aviso seguia porque no salia de pensando-, y si
+                    # lo interrumpias con Escape se quedaba trabajando para siempre.
+                    estado.calla_dialogo()
                     self.pasa_a(DORMIDO)
 
             elif self.estado == HABLANDO and not config.HABLANDO.exists():
@@ -335,7 +339,7 @@ class Asistente:
             if ahora - lento < 2.0:
                 continue
             lento = ahora
-            if self.estado in (DORMIDO, APAGADO) and estado.dialogo() and sesion.listo():
+            if estado.dialogo() and sesion.listo() and self.estado != HABLANDO:
                 # Si interrumpes al agente con Escape, el hook que apaga el aviso nunca
                 # corre. La pantalla del agente es la unica verdad.
                 estado.calla_dialogo()
