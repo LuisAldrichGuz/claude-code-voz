@@ -42,8 +42,19 @@ def asegura():
     # La ventana corre un SHELL, no `claude` directo: si Claude se cae o se sale,
     # la ventana sobrevive y se puede ver que paso. Lanzarlo como comando de la
     # sesion hacia que un tropiezo se llevara la sesion entera sin dejar rastro.
-    creada = _tmux("new-session", "-d", "-s", SESION, "-n", MAESTRO, "-c", CASA,
-                   "-x", "200", "-y", "50")
+    # El servidor de tmux se levanta en su PROPIO scope de systemd, fuera del demonio.
+    # Naciendo como hijo suyo hereda su cgroup, y entonces un `systemctl restart voz`
+    # -o el reinicio automatico tras un fallo- se lleva por delante al Claude maestro a
+    # media faena, sin avisar.
+    arranque = ["tmux", "new-session", "-d", "-s", SESION, "-n", MAESTRO, "-c", CASA,
+                "-x", "200", "-y", "50"]
+    creada = subprocess.run(
+        ["systemd-run", "--user", "--quiet", "--collect", "--scope",
+         "--unit", f"voz-tmux-{os.getpid()}", *arranque],
+        capture_output=True, text=True)
+    if creada.returncode != 0:
+        # Sin systemd-run (o sin bus de usuario) vale mas un tmux fragil que ninguno.
+        creada = subprocess.run(arranque, capture_output=True, text=True)
     if creada.returncode != 0:
         return False
     _tmux("set-option", "-t", SESION, "remain-on-exit", "on")
