@@ -119,6 +119,11 @@ bindr = , code:156, exec, ~/voz/bin/voz-tecla calla
 bind  = SUPER ALT, code:156, exec, ~/voz/bin/voz toggle
 ```
 
+**Arranca apagado.** Al entrar a la sesión el demonio se levanta, pero con el micrófono
+cerrado y sin subir whisper a la GPU: nadie quiere que una máquina recién encendida esté
+escuchando el cuarto. Se enciende con `SUPER+ALT+M5` (o `voz on`) y ahí sí se destapa el
+micro y sube el modelo.
+
 El nombre con el que se le llama, los umbrales y los tiempos están todos en
 [`voz/control/config.py`](voz/control/config.py).
 
@@ -128,6 +133,7 @@ El nombre con el que se le llama, los umbrales y los tiempos están todos en
 voz habla | calla     empieza y cierra el dictado (los llama la tecla)
 voz toggle | on | off enciende o apaga el asistente entero
 voz estado            en qué anda
+voz doctor            revisa todo y arregla lo que pueda
 voz log | oir         lo que entendió, y en vivo
 voz ver | agentes     abre el Claude maestro, o lista los que hay
 voz decir "texto"     léelo en voz alta
@@ -135,7 +141,13 @@ voz decir "texto"     léelo en voz alta
 
 ## Cuando algo falla
 
-[`docs/cuando-falla.md`](docs/cuando-falla.md) es una guía de reparación por síntoma. El
+Antes que nada, **`voz doctor`**: revisa las diez averías conocidas y arregla las que se
+pueden arreglar solas (micrófono muteado, isla caída, whisper pegado, marcas pegadas,
+maestro muerto, swayosd desconectado de PipeWire). Esa misma pasada corre sola **al
+arrancar** la sesión y **cada vez que lo enciendes** con SUPER+ALT+M5, calladita: lo que
+repara queda en `voz log` y solo avisa en pantalla si algo quedó roto sin arreglo.
+
+[`docs/cuando-falla.md`](docs/cuando-falla.md) es la guía de reparación por síntoma. El
 registro (`voz log`) nombra el motivo de **cada** descarte, que fue la lección más cara de
 todas: callarse cuando algo no se entrega hace parecer que el programa está descompuesto.
 
@@ -148,6 +160,7 @@ voz/agentes/        la sesión tmux donde vive el Claude Code maestro
 voz/dictado/        teclear en la ventana enfocada (solo si dices "escribe")
 voz/habla/          piper y la limpieza de markdown para que suene bien
 voz/control/        configuración, estado y el demonio (una máquina de estados)
+voz/salud/          el doctor: las averías conocidas y cómo se arreglan solas
 voz/indicador/      el punto en pantalla (GTK4 layer-shell)
 voz/claude_code/    los dos hooks: marcar el turno y leer la respuesta
 ```

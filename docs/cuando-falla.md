@@ -1,7 +1,21 @@
 # Cuando falla
 
-Reparacion por sintoma. Lo primero, siempre, son estas dos ordenes: dicen mas que
-cualquier sospecha.
+Lo primero es **`voz doctor`**: revisa todo lo de esta guia y arregla lo que se puede
+arreglar solo. Casi siempre ahi se acaba el problema.
+
+    voz doctor      revisa y repara; una linea por revision
+
+Esa misma pasada corre sola en los dos momentos en que las cosas se rompen -al arrancar
+la sesion (o tras `systemctl restart voz`) y al encender con SUPER+ALT+M5-, pero en
+silencio: lo que arregla lo deja en `voz log` y solo avisa en pantalla si algo quedo roto
+SIN arreglo. Lo que no sabe arreglar solo son las tres cosas que decide el usuario:
+aprobar la carpeta en el Claude maestro, los binds de la M5 y los hooks de Claude Code.
+
+Cada averia vive en `voz/salud/revisiones.py`, una funcion que la reconoce y otra que la
+repara. Un sintoma nuevo se agrega ahi y entra solo en las tres pasadas.
+
+Si el doctor dice que todo esta bien y aun asi falla, lo que sigue son estas dos ordenes:
+dicen mas que cualquier sospecha.
 
     voz estado      # demonio vivo, asistente encendido, si esta hablando
     voz log         # que oyo, que entrego y por que NO entrego
@@ -29,7 +43,8 @@ rapido`, `TTS: ...`, `SIN cancelacion de eco`). Si algo no llego, ahi dice por q
 En orden:
 
 1. `voz estado` - si dice apagado, enciendelo con **SUPER+ALT+M5**. Apagado es apagado:
-   el microfono esta cerrado y la tecla no hace nada, a proposito.
+   el microfono esta cerrado y la tecla no hace nada, a proposito. **Recien iniciada la
+   sesion siempre esta apagado**: el demonio arranca asi de fabrica.
 2. La tecla llama a `bin/voz-tecla`, que necesita el pid en
    `$XDG_RUNTIME_DIR/voz/daemon.pid`. Sin demonio, sale sin hacer ruido:
    `systemctl --user restart voz`.

@@ -39,7 +39,10 @@ class Transcriptor:
         """Levanta el servidor y espera a que el modelo termine de subir a la GPU."""
         if self.vivo():
             return True
-        self.proceso = subprocess.Popen(
+        # En una variable local, no solo en el atributo: apagando el asistente a media
+        # carga, `detiene()` deja `self.proceso` en None desde otro hilo y el poll de
+        # abajo reventaba el demonio entero.
+        proceso = subprocess.Popen(
             [
                 str(config.WHISPER_SERVER),
                 "-m", str(config.MODELO),
@@ -51,11 +54,12 @@ class Transcriptor:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        self.proceso = proceso
         limite = time.time() + espera
         while time.time() < limite:
             if self.vivo():
                 return True
-            if self.proceso.poll() is not None:
+            if proceso.poll() is not None:
                 return False
             time.sleep(0.5)
         return False
@@ -69,8 +73,28 @@ class Transcriptor:
                 self.proceso.kill()
         self.proceso = None
 
-    def texto_de(self, pcm):
+    def responde(self, espera=15):
+        """Prueba de verdad: le manda dos decimas de silencio y espera contestacion.
+
+        `vivo()` solo mira si el puerto acepta conexiones, y un servidor pegado la
+        acepta igual -contesta el kernel, no whisper-. Asi es como un servidor huerfano
+        que sobrevivio a un reinicio parece sano y se traga todas las frases.
+        """
+        try:
+            self._pide(b"\x00" * (config.TASA // 5), espera)
+            return True
+        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError, OSError):
+            return False
+
+    def texto_de(self, pcm, espera=60):
         """Audio crudo -> texto. Cadena vacia si no se entendio nada."""
+        try:
+            return self._pide(pcm, espera)
+        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError, OSError):
+            return ""
+
+    def _pide(self, pcm, espera):
+        """Manda el audio al servidor. Revienta si no contesta: eso lo usa `responde`."""
         frontera = uuid.uuid4().hex
         partes = []
         for campo, valor in (("temperature", "0.0"), ("response_format", "json"),
@@ -91,8 +115,5 @@ class Transcriptor:
             data=b"".join(partes),
             headers={"Content-Type": f"multipart/form-data; boundary={frontera}"},
         )
-        try:
-            with urllib.request.urlopen(peticion, timeout=60) as respuesta:
-                return json.loads(respuesta.read()).get("text", "").strip()
-        except (urllib.error.URLError, json.JSONDecodeError, TimeoutError):
-            return ""
+        with urllib.request.urlopen(peticion, timeout=espera) as respuesta:
+            return json.loads(respuesta.read()).get("text", "").strip()

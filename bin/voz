@@ -9,6 +9,7 @@
   voz estado    en que anda
   voz decir T   lee T en voz alta (lo usa el hook de Claude Code)
   voz callate   corta lo que se este leyendo
+  voz doctor    revisa que todo este en su sitio y arregla lo que pueda
   voz log       ultimas frases que entendio
   voz oir       muestra EN VIVO lo que va oyendo (Ctrl+C para salir)
   voz ver       abre una terminal con tu Claude maestro
@@ -125,6 +126,10 @@ def main():
         except KeyboardInterrupt:
             pass
         return 0
+
+    if orden == "doctor":
+        from voz.salud.doctor import informe_en_pantalla
+        return informe_en_pantalla()
 
     if orden == "log":
         if config.REGISTRO.exists():

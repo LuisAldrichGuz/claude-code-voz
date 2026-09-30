@@ -51,7 +51,7 @@ class Asistente:
         self.pendientes = queue.Queue()
         self.candado = threading.Lock()
 
-        self.estado = DORMIDO
+        self.estado = APAGADO
         self.desde = time.time()      # cuando se entro al estado actual
         self.borrador = []            # lo que llevas dicho de este mensaje
         self.tecla = False            # la M5 esta apretada ahora mismo
@@ -121,12 +121,37 @@ class Asistente:
         estado.marca_escuchando(encendido)
         if encendido:
             destapa()
+            # Que suba ya a la GPU, pero en OTRO hilo: esto corre dentro del manejador
+            # de SIGHUP y `arranca()` se espera a que el modelo termine de subir. Si se
+            # llama aqui mismo, un segundo toque de la tecla entra encima del primero y
+            # tumba el demonio a media carga.
+            threading.Thread(target=self._enciende_whisper, daemon=True).start()
         else:
             self.tecla = False
             self.transcriptor.detiene()
         estado.tono("listo" if encendido else "dormido")
         estado.osd(encendido)
         self.pasa_a(DORMIDO if encendido else APAGADO)
+
+    def _enciende_whisper(self):
+        """Sube el modelo y, ya arriba, pasa el doctor.
+
+        En este orden y en el mismo hilo a proposito: revisando a la vez, el doctor
+        encuentra el servidor a medio subir, lo da por pegado y lo mata.
+        """
+        self.transcriptor.arranca()
+        self.revisa_salud("al encender")
+
+    def revisa_salud(self, motivo, espera=0.0):
+        """Pasada del doctor con el transcriptor del demonio.
+
+        Con uno propio levantaria un whisper que el demonio no conoce y acabarian dos
+        peleandose el puerto.
+        """
+        from voz.salud.doctor import Contexto, en_silencio
+        if espera:
+            time.sleep(espera)
+        en_silencio(Contexto(self.transcriptor, dentro=True), motivo)
 
     # --- ciclo de vida -----------------------------------------------------
     def instala_senales(self):
@@ -147,11 +172,16 @@ class Asistente:
         estado.prepara_sonidos()
         config.RUN.mkdir(parents=True, exist_ok=True)
         config.PID.write_text(str(os.getpid()))
-        estado.marca_escuchando(True)
-        destapa()
-        # Se levanta ya: esperando al primer uso, la primera frase se queda esperando a
-        # que el modelo suba a la GPU.
-        self.transcriptor.arranca()
+        # Nace APAGADO a proposito: al entrar a la sesion no se abre el microfono, no
+        # sube whisper a la GPU y no se crea el agente. Se enciende con SUPER+ALT+M5 o
+        # con `voz on`, que es donde ya se destapa el micro y arranca el modelo.
+        estado.marca_escuchando(False)
+        # Al entrar a la sesion o tras un `systemctl restart voz`: el microfono pudo
+        # quedar muteado, la isla caida o media sesion anterior tirada por ahi. Se
+        # espera un poco a que el resto del escritorio acabe de levantarse, para no
+        # confundir lo que aun no arranca con lo que esta roto.
+        threading.Thread(target=self.revisa_salud, args=("al arrancar", 8.0),
+                         daemon=True).start()
         for tarea in (self.graba, self.trabaja, self.vigila, self.mira):
             threading.Thread(target=self._sin_morirse, args=(tarea,), daemon=True).start()
         while self.vivo:
