@@ -38,7 +38,8 @@ def di(texto, limpiar=True):
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         )
         reproductor = subprocess.Popen(
-            ["paplay", "--raw", "--format=s16le", f"--rate={_tasa()}", "--channels=1"],
+            ["paplay", "--raw", "--format=s16le", f"--rate={_tasa()}", "--channels=1",
+             f"--volume={int(65536 * config.VOZ_VOLUMEN)}"],
             stdin=piper.stdout, stderr=subprocess.DEVNULL,
         )
         piper.stdout.close()

@@ -1,9 +1,13 @@
-"""Reconoce el nombre al principio de lo que dijiste y separa la orden que sigue.
+"""Reconoce con cual de sus nombres lo llamaste y separa la orden que sigue.
 
 Whisper no escribe el nombre igual dos veces, asi que no se compara literal: se normaliza
-y se acepta cualquier forma parecida. El nombre es "Claudio" y no "Claude" por esto mismo:
-whisper transcribe en espanol y "Claude" le salia "Claro" o "Cloud", y "Claro" es palabra
-comun -aceptarla despertaba al asistente a media conversacion-.
+y se acepta cualquier forma parecida. Responde a DOS nombres, "claudio" y "glados", y en
+config.NOMBRES esta cada uno con las formas en que whisper lo suele escribir. No es
+"claude" por esto mismo: transcribe en espanol y le salia "claro" o "cloud", y "claro" es
+palabra comun -aceptarla despertaba al asistente a media conversacion-.
+
+Se devuelve CUAL de los dos nombre se oyo, no un si o un no, para que en el registro
+quede con cual lo despertaron y se pueda depurar cual de los dos falla.
 """
 import difflib
 import re
@@ -15,28 +19,47 @@ _BASURA = re.compile(r"[^\w\s]", re.UNICODE)
 
 
 def normaliza(texto):
-    """minusculas, sin acentos y sin puntuacion: 'Claudio, ¿abres?' -> 'claudio abres'."""
+    """minusculas, sin acentos y sin puntuacion: 'Claudio, ¿abres?' -> 'claudio abres'.
+
+    El "2" se escribe como palabra porque whisper oye "GLaDOS" y transcribe "Gela 2":
+    la segunda mitad del nombre le suena al numero y lo pone en digito.
+    """
     plano = unicodedata.normalize("NFD", texto.lower())
     plano = "".join(c for c in plano if unicodedata.category(c) != "Mn")
-    return _BASURA.sub(" ", plano).strip()
+    return _BASURA.sub(" ", plano).replace("2", "dos").strip()
 
 
-def suena_al_nombre(palabra):
-    """True si la palabra se parece lo bastante al nombre."""
-    if palabra in config.VARIANTES:
-        return True
+def forma_conocida(palabra):
+    """El nombre al que corresponde esa forma EXACTA, o None. Sin parecidos."""
+    for nombre, como_suena in config.NOMBRES.items():
+        if palabra in como_suena["variantes"]:
+            return nombre
+    return None
+
+
+def cual_nombre(palabra):
+    """Con cual de sus nombres lo llamaron, o None si esa palabra no es ninguno."""
+    # Primero las formas exactas: valen aunque sean cortas o se parezcan a algo comun.
+    nombre = forma_conocida(palabra)
+    if nombre:
+        return nombre
     if palabra in config.NO_ES_NOMBRE or len(palabra) < 4:
-        return False
-    # Se compara contra TODAS las formas largas conocidas y no solo contra "claudio":
-    # whisper oye "gloud", que se parece a "cloud" y no a "claudio". Las variantes de
-    # cuatro letras quedan fuera del parecido -son tan cortas que "claro" les pegaria- y
-    # solo valen por coincidencia exacta. El corte es 0.75: con 0.72 despertaba con "clase".
-    formas = [config.DESPIERTO] + [v for v in config.VARIANTES if len(v) >= 5]
-    return max(difflib.SequenceMatcher(None, palabra, f).ratio() for f in formas) >= 0.75
+        return None
+    # Y luego por parecido, para el nombre que lo admita. Se compara contra TODAS sus
+    # formas largas y no solo contra el nombre: whisper oye "gloud", que se parece a
+    # "cloud" y no a "claudio". Las formas de cuatro letras quedan fuera -son tan cortas
+    # que "claro" les pegaria- y solo valen exactas.
+    for nombre, como_suena in config.NOMBRES.items():
+        umbral = como_suena["parecido"]
+        formas = [f for f in como_suena["variantes"] if len(f) >= 5]
+        if umbral and formas and max(difflib.SequenceMatcher(None, palabra, f).ratio()
+                                     for f in formas) >= umbral:
+            return nombre
+    return None
 
 
 def separa_nombre(texto, donde_sea=False):
-    """Devuelve (te_llamaron, resto).
+    """Devuelve (con_que_nombre, resto). El nombre es None si no te llamaron.
 
     Normalmente el nombre solo cuenta en las primeras tres palabras: asi "Claudio, borra
     esto" despierta y "el codigo de Claudio esta raro" no.
@@ -49,6 +72,16 @@ def separa_nombre(texto, donde_sea=False):
     palabras = texto.split()
     ventana = len(palabras) if donde_sea else 3
     for i, palabra in enumerate(palabras[:ventana]):
-        if suena_al_nombre(normaliza(palabra)):
-            return True, " ".join(palabras[i + 1:]).lstrip(" ,.;:")
-    return False, texto
+        nombre = cual_nombre(normaliza(palabra))
+        if nombre:
+            return nombre, " ".join(palabras[i + 1:]).lstrip(" ,.;:")
+        # Whisper parte el nombre en dos ("gla dos", "cla dos") porque la segunda
+        # mitad le suena a una palabra que conoce. Se prueba tambien pegado, pero
+        # EXIGIENDO forma exacta: con parecido, "el audio" pega con "glaudio" y
+        # "las dos" con "glados", y despertaba a media conversacion.
+        if i + 1 < len(palabras):
+            pegadas = normaliza(palabra) + normaliza(palabras[i + 1])
+            nombre = forma_conocida(pegadas)
+            if nombre:
+                return nombre, " ".join(palabras[i + 2:]).lstrip(" ,.;:")
+    return None, texto

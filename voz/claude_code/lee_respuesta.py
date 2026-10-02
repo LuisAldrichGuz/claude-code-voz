@@ -20,13 +20,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from voz.agentes import sesion  # noqa: E402
+from voz.claude_code import leido  # noqa: E402
 from voz.control import config, estado  # noqa: E402
 from voz.habla import piper_voz, texto_hablable  # noqa: E402
 
 HABLANDO_EL = ("grabando",)
 ESPERA_TURNO = 45.0  # tope para no quedarse mudo si el micro se queda abierto
 
-MARCA = config.RUN / "leido.json"
 ESPERA_MAX = 4.0   # segundos que se le dan al transcript para acabar de escribirse
 PAUSA = 0.25
 
@@ -63,20 +63,6 @@ def _texto(registro):
     return "\n".join(t for t in trozos if t.strip()).strip()
 
 
-def _marca_leida():
-    try:
-        return json.loads(MARCA.read_text())
-    except (OSError, json.JSONDecodeError):
-        return {}
-
-
-def _apunta_leido(transcript, linea):
-    config.RUN.mkdir(parents=True, exist_ok=True)
-    marcas = _marca_leida()
-    marcas[transcript] = linea
-    MARCA.write_text(json.dumps(marcas))
-
-
 def pendiente(transcript):
     """Lo que dijo el asistente y todavia no te ha leido, en orden. (texto, hasta_linea)
 
@@ -85,7 +71,7 @@ def pendiente(transcript):
     hasta donde se leyo, asi nunca repite ni se salta un bloque.
     """
     registros = _registros(transcript)
-    desde = _marca_leida().get(transcript)
+    desde = leido.hasta(transcript)
     if desde is None:
         # Primera vez en esta conversacion: se arranca en tu ultimo mensaje, para no
         # soltarte de golpe toda la sesion en voz alta.
@@ -100,50 +86,61 @@ def pendiente(transcript):
     return "\n\n".join(dichos), len(registros)
 
 
-def respuesta_completa(transcript):
-    """Igual, pero esperando a que el ultimo bloque acabe de aterrizar en el archivo.
+def espera_a_que_cuaje(transcript):
+    """Espera a que el ultimo bloque acabe de aterrizar en el archivo.
 
     El hook arranca antes de que Claude Code termine de escribir el cierre del turno,
-    asi que preguntar una sola vez te deja leyendo la respuesta de hace dos bloques.
-    Se relee hasta que el texto deja de crecer.
+    asi que mirar una sola vez te deja leyendo la respuesta de hace dos bloques. Se
+    relee hasta que el texto deja de crecer. Va SIN candado -son segundos de espera-
+    y la foto buena se toma despues, ya dentro del candado.
     """
-    mejor, hasta = pendiente(transcript)
+    mejor = pendiente(transcript)[0]
     limite = time.monotonic() + ESPERA_MAX
     while time.monotonic() < limite:
         time.sleep(PAUSA)
-        ahora, tope = pendiente(transcript)
+        ahora = pendiente(transcript)[0]
         if len(ahora) <= len(mejor):
-            break
-        mejor, hasta = ahora, tope
-    return mejor, hasta
+            return
+        mejor = ahora
 
 
-def es_el_maestro():
-    """Solo habla el Claude que vive en la sesion tmux de voz.
+RECADO_MAX = 2400   # caracteres de la respuesta del agente que se le pasan al maestro
 
-    El hook esta puesto global, asi que sin esto CUALQUIER Claude Code abierto lee sus
-    respuestas en voz alta: los que se manejan por teclado tambien, y acaban hablando
-    todos encima. Se sube por los procesos padre hasta ver si alguno es el panel de
-    tmux donde vive el maestro.
+
+def pasa_al_maestro(ventana, texto):
+    """Un agente que no es el maestro no habla: le cuenta al maestro y ese resume.
+
+    Dos agentes leyendo su respuesta entera en voz alta se encimarian y no habria
+    forma de saber cual es cual. Asi solo habla una voz -la de siempre- y ademas
+    llega masticado: el maestro ya sabe en que andaba cada quien.
+
+    El recado va en UNA linea a proposito: se entrega con `send-keys -l`, y ahi un
+    salto de linea es un Enter, o sea el mensaje mandado a la mitad.
     """
-    panes = subprocess.run(
-        ["tmux", "list-panes", "-t", sesion.SESION, "-F", "#{pane_pid}"],
-        capture_output=True, text=True)
-    if panes.returncode != 0:
-        return False
-    duenos = {l.strip() for l in panes.stdout.splitlines() if l.strip()}
-    pid = os.getpid()
-    for _ in range(12):   # el arbol hook -> claude -> shell -> pane es cortito
-        try:
-            with open(f"/proc/{pid}/stat") as f:
-                pid = f.read().rsplit(")", 1)[1].split()[1]
-        except (OSError, IndexError):
-            return False
-        if pid in duenos:
-            return True
-        if pid == "1":
-            return False
+    from voz.agentes import envio
+    recorte = texto.strip()[:RECADO_MAX]
+    if len(texto.strip()) > RECADO_MAX:
+        recorte += "…"
+    plano = " ".join(recorte.split())
+    recado = (f"[aviso automático] El agente «{ventana}» acabó su turno. Lo último que "
+              f"dijo fue: {plano} — Resúmeselo a Luis en voz alta en dos renglones: qué "
+              f"hizo y si quedó bien o falta algo.")
+    if envio.envia(recado):
+        _traza(f"recado de {ventana} entregado al maestro")
+        return True
+    _traza(f"el maestro no pudo recibir el recado de {ventana}")
     return False
+
+
+def avisa_que_acabo(ventana):
+    """Plan B cuando el maestro no puede recibir el recado: el aviso pelon, hablado."""
+    limite = time.monotonic() + ESPERA_TURNO
+    while config.HABLANDO.exists() and time.monotonic() < limite:
+        time.sleep(0.2)   # que acabe el que este hablando; no hay cola, se encimarian
+    if piper_voz.di(f"{ventana} ya acabó", limpiar=False):
+        _traza(f"aviso de que {ventana} acabo")
+    else:
+        _traza(f"no se pudo avisar que {ventana} acabo")
 
 
 def _traza(motivo):
@@ -158,7 +155,8 @@ def main():
     if not estado.escuchando():
         _traza("callado, el micro esta apagado")
         return 0
-    if not es_el_maestro():
+    ventana = sesion.ventana_actual()
+    if not ventana:
         return 0
     try:
         evento = json.load(sys.stdin)
@@ -170,22 +168,40 @@ def main():
         return 0
 
     transcript = evento.get("transcript_path", "")
-    texto, hasta = respuesta_completa(transcript)
+    espera_a_que_cuaje(transcript)
+
+    # Mirar y apuntar, de un tiron y con el candado agarrado. Es lo UNICO que impide
+    # que este hook y el de avance se lleven el mismo bloque y se lo lean dos veces.
+    # Se apunta antes de hablar a proposito: si te cansas y lo cortas, no te lo repite.
+    with leido.turno():
+        texto, hasta = pendiente(transcript)
+        if texto:
+            leido.apunta(transcript, hasta)
+
+    # Los demas agentes no hablan: le pasan el recado al maestro y el resume.
+    if ventana != sesion.MAESTRO:
+        if not (texto and pasa_al_maestro(ventana, texto)):
+            avisa_que_acabo(ventana)
+        return 0
+
     if not texto:
         _traza("sin texto nuevo que leer")
         estado.calla_dialogo()
         return 0
 
-    # Nunca arrancar a leer mientras tiene la tecla apretada.
+    # Nunca arrancar a leer mientras tiene la tecla apretada, ni encima de un "ahí
+    # voy" que siga sonando: no hay cola, las dos voces saldrian juntas.
     limite = time.monotonic() + ESPERA_TURNO
-    while estado.pulso().get("fase") in HABLANDO_EL and time.monotonic() < limite:
-        time.sleep(0.2)
+    while time.monotonic() < limite:
+        if estado.pulso().get("fase") in HABLANDO_EL or config.HABLANDO.exists():
+            time.sleep(0.2)
+            continue
+        break
 
     # La isla la muestra mientras piper la lee, para poder seguirla con la vista
     # aunque el audio vaya a la mitad.
     hablado = texto_hablable.limpia(texto)
     estado.dice("responde", hablado, vida=max(12.0, len(hablado) / 12))
-    _apunta_leido(transcript, hasta)   # antes de hablar: si te cansas y lo cortas, no te lo repite
     if piper_voz.di(texto):
         _traza(f"leido ({len(hablado)} caracteres, {texto.count(chr(10) * 2) + 1} bloques)")
     else:
