@@ -31,6 +31,8 @@ def normaliza(texto):
 
 def forma_conocida(palabra):
     """El nombre al que corresponde esa forma EXACTA, o None. Sin parecidos."""
+    if palabra in config.NO_ES_NOMBRE:
+        return None
     for nombre, como_suena in config.NOMBRES.items():
         if palabra in como_suena["variantes"]:
             return nombre

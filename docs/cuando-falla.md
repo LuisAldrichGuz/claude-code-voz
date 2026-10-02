@@ -35,7 +35,8 @@ rapido`, `TTS: ...`, `SIN cancelacion de eco`). Si algo no llego, ahi dice por q
   es que el servidor esta caido. Lo apaga el vigilante para soltar la VRAM y lo arranca
   cualquiera de los dos caminos; comprueba con `voz estado` y el log (`whisper no arranco`).
 - **`sin el nombre, no se entrego`** - se oyo, pero no se reconocio "Claudio" en la frase.
-  Mira como lo transcribio y, si es una forma nueva, agregala a `VARIANTES`.
+  Mira como lo transcribio y, si es una forma nueva, agregala al nombre que toque
+  en `config.NOMBRES`. Responde a dos: "Claudio" y "GLaDOS".
 - **Ninguna linea** - no esta llegando audio: ver la seccion del microfono, abajo.
 
 ## Aprieto la tecla y no pasa nada

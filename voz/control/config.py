@@ -71,12 +71,18 @@ NOMBRES = {
                       "clot", "claud", "cloude", "clow", "gloud", "glod",
                       "glaude", "glau"),
     },
+    # Solo formas que NO existen como palabra en espanol, ni se parecen a una por
+    # una letra. Fuera quedaron "glado", "plados", "clados", "gelados" y "geladas":
+    # todas caen a un paso de "lado", "lados" o "helados", y una de ellas ya le
+    # desperto el asistente a media conversacion.
+    #
+    # El criterio, que no se relaje: mas vale que a veces NO despierte y haya que
+    # repetir el nombre, a que despierte solo. Un falso positivo le interrumpe lo
+    # que esta haciendo; un falso negativo cuesta decirlo otra vez.
     "glados": {
         "parecido": None,
-        "variantes": ("glados", "glado", "gladios", "gladoz", "gladus", "gladis",
-                      "gladdos", "gladox", "gladys", "gladas", "gladoss", "glaods",
-                      "cladios", "clados", "cladoz", "gladosh", "plados",
-                      "gelados", "geladas"),
+        "variantes": ("glados", "gladios", "gladoz", "gladus", "gladys", "gladis",
+                      "gladdos", "gladox", "gladosh", "gladoss", "glaods"),
     },
 }
 

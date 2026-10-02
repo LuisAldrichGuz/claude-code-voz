@@ -293,6 +293,9 @@ class Asistente:
             # detras, asi que el nombre casi nunca cae en las primeras palabras.
             llamado, resto = palabra_clave.separa_nombre(texto, donde_sea=True)
             if llamado:
+                # Con cual de los dos nombres lo despertaron: si uno falla mas que
+                # el otro, aqui se ve sin tener que adivinar.
+                estado.apunta(f"{time.strftime('%H:%M:%S')}  despertado con «{llamado}»")
                 texto = resto.strip()
             elif self.estado not in (RESPIRO, OYENDO):
                 estado.apunta(f"{time.strftime('%H:%M:%S')}  sin el nombre, no se entrego")

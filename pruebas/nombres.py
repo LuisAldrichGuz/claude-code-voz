@@ -21,10 +21,9 @@ DESPIERTAN = {
     "claudio": ["Claudio, abre el archivo", "claudio revisa esto", "Cloud, que hora es",
                 "claudia ven", "glaudio hola", "Clodio, apaga"],
     "glados": ["GLaDOS, abre el archivo", "glados revisa esto", "Gladios, commitea",
-               "Gladys, apaga el micro", "gla dos abre la terminal", "cla dos revisa",
-               "Gladoz, ya quedo?", "GLaDOS", "gladus borra eso", "Glado, commitea",
-               # tal cual lo escribio whisper al oir el nombre
-               "Gela 2. Abre el archivo", "Plados, revisa los tests", "gla 2 abre"],
+               "Gladys, apaga el micro", "gla dos abre la terminal",
+               "Gladoz, ya quedo?", "GLaDOS", "gladus borra eso", "gladis apaga",
+               "gla 2 abre"],   # whisper escribe el "dos" en digito
 }
 
 CALLADO = [
@@ -35,6 +34,8 @@ CALLADO = [
     "de dos en dos", "mira los datos", "la dos esta rota", "subele dos grados",
     "el lado derecho", "cuadros de dialogo", "claramente no", "a ambos lados",
     "treinta grados centigrados", "dos por dos", "son las 2", "a 2 grados",
+    # las que de verdad le dispararon el asistente a media conversacion
+    "los lados estan mal", "ge lados por favor", "pla dos cosas", "cla dos veces",
 ]
 
 
