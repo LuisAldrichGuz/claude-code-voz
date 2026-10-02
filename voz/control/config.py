@@ -15,7 +15,7 @@ IDIOMA = "es"
 
 # --- piper (voz sintetica en espanol) ---
 PIPER = RAIZ / ".venv" / "bin" / "piper"
-VOZ_MODELO = RAIZ / "voces" / "es_MX-claude-high.onnx"
+# Que voz habla se elige con `voz motor`; ver voz/habla/catalogo.py.
 
 # --- audio de entrada ---
 TASA = 16000          # whisper solo come 16 kHz mono

@@ -79,8 +79,12 @@ def en_silencio(ctx=None, motivo="revision"):
 
 def informe_en_pantalla():
     """`voz doctor`: una linea por revision, y al final que hacer si algo sigue mal."""
+    from voz.habla import catalogo
     encendido = config.ESCUCHANDO.exists()
-    print(f"Asistente {'ENCENDIDO' if encendido else 'apagado'}. Revisando...\n")
+    # Cual es la voz va en la cabecera y no en una revision: lo normal es que este
+    # bien, y lo que hacia falta era poder VERLO sin que nada estuviera roto.
+    print(f"Asistente {'ENCENDIDO' if encendido else 'apagado'}. "
+          f"Voz: {catalogo.actual().stem}. Revisando...\n")
 
     def pinta(nombre, queja, arreglo):
         if not queja:

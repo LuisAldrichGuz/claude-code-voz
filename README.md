@@ -137,6 +137,7 @@ voz doctor            revisa todo y arregla lo que pueda
 voz log | oir         lo que entendió, y en vivo
 voz ver | agentes     abre el Claude maestro, o lista los que hay
 voz decir "texto"     léelo en voz alta
+voz prueba            óyela ya; voz motor cambia de voz entre las de voces/
 ```
 
 ## Cuando algo falla

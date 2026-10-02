@@ -100,8 +100,46 @@ def repara_microfono(ctx):
 
 def mira_instalacion(ctx):
     faltan = [str(p) for p in (config.WHISPER_SERVER, config.MODELO, config.PIPER,
-                               config.VOZ_MODELO, config.MODELO_VAD) if not Path(p).exists()]
+                               config.MODELO_VAD) if not Path(p).exists()]
     return "falta " + ", ".join(faltan) if faltan else None
+
+
+# --- la voz -------------------------------------------------------------------
+# Que voz esta hablando se elige con `voz motor` y vive en un archivo, no en el
+# config. Y hay una trampa que costo una tarde: el demonio se queda con la voz que
+# habia cuando arranco, asi que tras cambiarla los acuses ("ahi voy") siguen
+# sonando con la anterior y las respuestas largas con la nueva. Suena desparejo y
+# no hay forma de adivinar por que. Por eso se revisa la hora.
+
+def mira_voz(ctx):
+    from voz.habla import catalogo
+    modelo = catalogo.actual()
+    if not modelo.exists():
+        return f"la voz puesta ({modelo.stem}) no esta en voces/"
+    if ctx.dentro:
+        return None             # dentro del demonio, reiniciarlo seria matarse solo
+    try:
+        pid = int(config.PID.read_text())
+    except (OSError, ValueError):
+        return None             # sin demonio ya se queja la revision de arriba
+    lleva = _lleva_vivo(pid)
+    try:
+        desde_el_cambio = time.time() - catalogo.ELECCION.stat().st_mtime
+    except OSError:
+        return None             # nunca se ha cambiado: habla la de fabrica
+    if lleva > 0 and desde_el_cambio < lleva:
+        return (f"el demonio arranco antes del ultimo cambio de voz: los acuses "
+                f"suenan con la anterior y las respuestas con {modelo.stem}")
+    return None
+
+
+def repara_voz(ctx):
+    _corre("systemctl", "--user", "restart", "voz")
+    for _ in range(20):
+        time.sleep(0.5)
+        if mira_voz(ctx) is None:
+            return "demonio reiniciado con la voz nueva"
+    return None
 
 
 def mira_whisper(ctx):
@@ -275,6 +313,7 @@ REVISIONES = (
     ("isla",       mira_indicador,     repara_indicador),
     ("microfono",  mira_microfono,     repara_microfono),
     ("instalado",  mira_instalacion,   None),
+    ("voz",        mira_voz,           repara_voz),
     ("whisper",    mira_whisper,       repara_whisper),
     ("marcas",     mira_marcas,        repara_marcas),
     ("maestro",    mira_maestro,       repara_maestro),

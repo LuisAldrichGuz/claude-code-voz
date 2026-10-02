@@ -8,6 +8,8 @@
   voz on | off  fuerza uno de los dos
   voz estado    en que anda
   voz decir T   lee T en voz alta (lo usa el hook de Claude Code)
+  voz prueba    suelta una frase de muestra con la voz puesta
+  voz motor V   lista las voces, o pone otra: voz motor es_MX-claude-high
   voz callate   corta lo que se este leyendo
   voz doctor    revisa que todo este en su sitio y arregla lo que pueda
   voz log       ultimas frases que entendio
@@ -77,6 +79,25 @@ def main():
             print(f"Ya estaba {'encendido' if quiere else 'apagado'}")
             return 0
         return manda(signal.SIGHUP)
+
+    if orden == "motor":
+        from voz.habla import catalogo
+        if len(sys.argv) > 2:
+            if not catalogo.elige(sys.argv[2]):
+                print(f"No tengo esa voz. Hay: {', '.join(catalogo.disponibles())}")
+                return 1
+        puesta = catalogo.actual().stem
+        for nombre in catalogo.disponibles():
+            print(f"  {'*' if nombre == puesta else ' '} {nombre}")
+        return 0
+
+    if orden == "prueba":
+        from voz.habla import catalogo, piper_voz
+        frase = " ".join(sys.argv[2:]) or (
+            "Ya quedó. Revisé el archivo prosodia punto pe i y ahora sí hace pausas. "
+            "¿Así te late más?")
+        print(f"voz: {catalogo.actual().stem}")
+        return 0 if piper_voz.di(frase) else 1
 
     if orden == "decir":
         from voz.habla import piper_voz

@@ -101,6 +101,9 @@ la salida del hook con `2>/dev/null`, asi que sin esa linea no hay forma de sabe
 - Ninguna linea - la sesion no es el maestro. Solo habla el Claude Code que vive en la
   ventana de tmux `voz`; los que manejas por teclado se quedan callados a proposito.
 - `piper no pudo hablar` - falta `.venv/bin/piper` o la voz `.onnx`.
+- **Habla con dos voces distintas** (los "ahí voy" con una y las respuestas con
+  otra): cambiaste de voz con `voz motor` y el demonio sigue con la de antes en
+  memoria. `systemctl --user restart voz`, o `voz doctor`, que ya lo detecta.
 
 **Lee solo un pedazo.** Lleva marca de lo ya leido (`leido.json`) y espera a que el
 transcript deje de crecer: el texto final del turno se escribe TARDE, asi que leer "el

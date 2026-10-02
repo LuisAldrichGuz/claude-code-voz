@@ -3,20 +3,20 @@ import json
 import subprocess
 
 from voz.control import config
-from voz.habla import texto_hablable
+from voz.habla import catalogo, texto_hablable
 
 
 def _tasa():
     """La tasa de muestreo la declara el propio modelo en su .json."""
     try:
-        with open(f"{config.VOZ_MODELO}.json") as f:
+        with open(f"{catalogo.actual()}.json") as f:
             return json.load(f)["audio"]["sample_rate"]
     except (OSError, KeyError, json.JSONDecodeError):
         return 22050
 
 
 def disponible():
-    return config.PIPER.exists() and config.VOZ_MODELO.exists()
+    return config.PIPER.exists() and catalogo.actual().exists()
 
 
 def di(texto, limpiar=True):
@@ -33,7 +33,8 @@ def di(texto, limpiar=True):
     config.HABLANDO.touch()
     try:
         piper = subprocess.Popen(
-            [str(config.PIPER), "-m", str(config.VOZ_MODELO), "--output-raw"],
+            # Sin banderas: el modelo lee como fue entrenado para leer.
+            [str(config.PIPER), "-m", str(catalogo.actual()), "--output-raw"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         )
         reproductor = subprocess.Popen(
